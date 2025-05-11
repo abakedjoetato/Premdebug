@@ -1,8 +1,8 @@
-modules = ["nodejs-20"]
+modules = ["python-3.11"]
 
 [nix]
 channel = "stable-24_05"
-packages = ["unzip"]
+packages = ["cacert", "freetype", "lcms2", "libimagequant", "libjpeg", "libsodium", "libtiff", "libwebp", "libxcrypt", "nettle", "openjpeg", "openssh", "openssl", "tcl", "tk", "zlib"]
 
 [workflows]
 runButton = "Project"
@@ -14,15 +14,15 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "FileCheck"
+args = "DiscordBot"
 
 [[workflows.workflow]]
-name = "FileCheck"
+name = "DiscordBot"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "ls -la && echo \"Checking for Discord bot files...\""
+args = "python main.py"
 
 [deployment]
-run = ["sh", "-c", "ls -la && echo \"Checking for Discord bot files...\""]
+run = ["sh", "-c", "python main.py"]
