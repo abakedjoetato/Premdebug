@@ -442,6 +442,63 @@ class Guild(BaseModel):
         from config import PREMIUM_TIERS
         tier_info = PREMIUM_TIERS.get(self.premium_tier, {})
         return tier_info.get("max_servers", 1)
+        
+    def check_feature_access(self, feature_name: str) -> bool:
+        """Check if guild has access to a specific premium feature
+        
+        This method implements tier inheritance, ensuring that
+        higher tiers have access to all features from lower tiers.
+        
+        Args:
+            feature_name: Name of the feature to check
+            
+        Returns:
+            bool: True if guild has access to the feature, False otherwise
+        """
+        # Import PREMIUM_FEATURES here to avoid circular imports
+        from utils.premium import PREMIUM_FEATURES
+        
+        # Log for debugging premium access issues
+        logger.info(f"[PREMIUM_DEBUG] Checking feature '{feature_name}' access for guild {self.guild_id}")
+        
+        # Default to tier 0 if premium_tier is None or invalid
+        try:
+            if hasattr(self, 'premium_tier') and self.premium_tier is not None:
+                # Ensure premium_tier is an integer
+                if isinstance(self.premium_tier, int):
+                    guild_tier = self.premium_tier
+                else:
+                    # Convert to int if possible
+                    guild_tier = int(self.premium_tier)
+            else:
+                guild_tier = 0
+        except (ValueError, TypeError):
+            logger.warning(f"Invalid premium_tier value: {getattr(self, 'premium_tier', None)}, defaulting to 0")
+            guild_tier = 0
+            
+        # Ensure tier is within valid range
+        guild_tier = max(0, min(5, guild_tier))
+        
+        # Tier 4+ (Overseer) has access to all features
+        if guild_tier >= 4:
+            logger.info(f"[PREMIUM_DEBUG] Guild {self.guild_id} has tier {guild_tier} >= 4, auto-granting access to all features")
+            return True
+            
+        # Special fast-path for essential features available at tier 1+
+        if feature_name in ['stats', 'leaderboards', 'basic_stats'] and guild_tier >= 1:
+            logger.info(f"[PREMIUM_DEBUG] Fast-path access granted for essential feature '{feature_name}' at tier {guild_tier}")
+            return True
+            
+        # Get the minimum tier required for this feature
+        if feature_name in PREMIUM_FEATURES:
+            min_tier_required = PREMIUM_FEATURES.get(feature_name, 999)
+            has_access = guild_tier >= min_tier_required
+            logger.info(f"[PREMIUM_DEBUG] Feature '{feature_name}' requires tier {min_tier_required}, guild has tier {guild_tier}, access: {has_access}")
+            return has_access
+        else:
+            # Feature not found in any tier
+            logger.warning(f"[PREMIUM_DEBUG] Feature '{feature_name}' not found in PREMIUM_FEATURES, access denied")
+            return False
 
     @classmethod
     async def get_by_guild_id(cls, db, guild_id: str) -> Optional['Guild']:
