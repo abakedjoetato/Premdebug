@@ -34,6 +34,12 @@ PREMIUM_FEATURES = {
     "stats": 1,  # Alias for basic_stats
     "leaderboards": 1,
     
+
+    # Tier 1 features (Survivor)
+    "basic_stats": 1,
+    "stats": 1,  # Alias for basic_stats
+    "leaderboards": 1,
+
     # Tier 2 features (Mercenary)
     "rivalries": 2,
     "bounties": 2,

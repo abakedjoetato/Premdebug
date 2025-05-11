@@ -809,62 +809,108 @@ class Guild(BaseModel):
         guild_id = getattr(self, 'guild_id', 'unknown')
         logger.info(f"[TIER_DEBUG] Guild {guild_id}: Checking feature access for '{feature_name}', raw premium_tier={self.premium_tier}, type={type(self.premium_tier).__name__}")
         
-        # CRITICAL FIX: Check for premium_tier data inconsistency
-        # If this is happening during an active Discord context, perform emergency DB verification
-        emergency_verified_tier = None
+        # EMERGENCY DIRECT DB CHECK: This is a crucial immediate fix that bypasses all caching and object issues
+        # For the most reliable results, check the database directly first
+        direct_db_tier = None
         try:
-            # Get direct tier value from DB if available, bypassing any object-level issues
             if hasattr(self, 'db') and self.db and hasattr(self, 'guild_id') and self.guild_id:
-                async def _verify_tier_from_db():
-                    try:
-                        guild_doc = await self.db.guilds.find_one({"guild_id": str(self.guild_id)}, {"premium_tier": 1})
-                        if guild_doc and "premium_tier" in guild_doc:
-                            db_tier = guild_doc.get("premium_tier")
-                            if db_tier is not None:
-                                return int(db_tier)
-                    except Exception as e:
-                        logger.error(f"[TIER_DEBUG] Error in emergency tier verification: {e}")
-                    return None
-
-                # Check if we're in an event loop
                 import asyncio
                 if asyncio.get_event_loop().is_running():
-                    # Create a task but don't wait - this avoids coroutine issues
-                    # We'll use the result next time if available, and rely on object tier this time
-                    asyncio.create_task(_verify_tier_from_db())
-                    logger.info(f"[TIER_DEBUG] Started background DB verification task for guild {guild_id}")
+                    # This will run a direct DB check in the background
+                    class DirectDbCheck:
+                        @staticmethod
+                        async def get_tier(db, guild_id):
+                            try:
+                                guild_doc = await db.guilds.find_one({"guild_id": str(guild_id)}, {"premium_tier": 1})
+                                if guild_doc and "premium_tier" in guild_doc:
+                                    db_tier = guild_doc.get("premium_tier")
+                                    if db_tier is not None:
+                                        try:
+                                            return int(db_tier)
+                                        except (ValueError, TypeError):
+                                            logger.error(f"[TIER_DEBUG] Invalid DB tier value: {db_tier}")
+                            except Exception as e:
+                                logger.error(f"[TIER_DEBUG] Error in direct DB tier check: {e}")
+                            return None
+                            
+                    try:
+                        # Try to get the tier directly, with a short timeout
+                        direct_db_tier = asyncio.run_coroutine_threadsafe(
+                            DirectDbCheck.get_tier(self.db, self.guild_id), 
+                            asyncio.get_event_loop()
+                        ).result(0.5)  # Half second timeout
+                        
+                        if direct_db_tier is not None:
+                            logger.info(f"[TIER_DEBUG] Successfully retrieved direct DB tier: {direct_db_tier}")
+                    except (asyncio.TimeoutError, concurrent.futures.TimeoutError):
+                        logger.warning("[TIER_DEBUG] Timeout getting direct DB tier")
+                    except Exception as e:
+                        logger.error(f"[TIER_DEBUG] Error running direct DB check: {e}")
         except Exception as e:
-            logger.error(f"[TIER_DEBUG] Error in emergency verification setup: {e}")
+            logger.error(f"[TIER_DEBUG] Error setting up direct DB check: {e}")
             
-        # Make sure premium_tier is an integer (fix for potential string storage issue)
-        try:
-            if emergency_verified_tier is not None:
-                # Use the directly verified tier if available
-                premium_tier = emergency_verified_tier
-                logger.info(f"[TIER_DEBUG] Using emergency verified tier: {premium_tier}")
-            elif isinstance(self.premium_tier, int):
-                # Already an int, use directly
-                premium_tier = self.premium_tier
-            elif isinstance(self.premium_tier, str) and self.premium_tier.strip().isdigit():
-                # Convert string to int
-                premium_tier = int(self.premium_tier.strip())
-            elif self.premium_tier is None:
-                # Default to 0 if None
+        # CRITICAL FIX: If we got a direct DB tier, and it's higher than what's in the object, use it
+        if direct_db_tier is not None and (
+            # Use direct DB tier if it's higher than the object's tier
+            # (after converting object tier to int for comparison)
+            not hasattr(self, 'premium_tier') or 
+            self.premium_tier is None or
+            direct_db_tier > (
+                int(self.premium_tier) 
+                if isinstance(self.premium_tier, (int, str)) and 
+                (isinstance(self.premium_tier, int) or (
+                    isinstance(self.premium_tier, str) and 
+                    self.premium_tier.isdigit()
+                )) 
+                else 0
+            )
+        ):
+            logger.info(f"[TIER_DEBUG] Using higher direct DB tier: {direct_db_tier} instead of object tier: {getattr(self, 'premium_tier', None)}")
+            premium_tier = direct_db_tier
+            
+            # Also update the object's tier for future checks in this session
+            try:
+                self.premium_tier = direct_db_tier
+                logger.info(f"[TIER_DEBUG] Updated object premium_tier to {direct_db_tier}")
+            except Exception as e:
+                logger.error(f"[TIER_DEBUG] Error updating object tier: {e}")
+        else:
+            # Use the object's tier with appropriate type conversions
+            try:
+                if not hasattr(self, 'premium_tier') or self.premium_tier is None:
+                    premium_tier = 0
+                    logger.warning(f"[TIER_DEBUG] No premium_tier in object, defaulting to 0")
+                elif isinstance(self.premium_tier, int):
+                    premium_tier = self.premium_tier
+                    logger.info(f"[TIER_DEBUG] Using existing integer premium_tier: {premium_tier}")
+                elif isinstance(self.premium_tier, str) and self.premium_tier.strip().isdigit():
+                    premium_tier = int(self.premium_tier.strip())
+                    logger.info(f"[TIER_DEBUG] Converted string premium_tier '{self.premium_tier}' to {premium_tier}")
+                else:
+                    # Last resort conversion
+                    try:
+                        premium_tier = int(self.premium_tier)
+                        logger.info(f"[TIER_DEBUG] Forced conversion of premium_tier {self.premium_tier} to {premium_tier}")
+                    except (ValueError, TypeError):
+                        logger.error(f"[TIER_DEBUG] Cannot convert premium_tier {self.premium_tier} to int, defaulting to 0")
+                        premium_tier = 0
+            except Exception as e:
+                logger.error(f"[TIER_DEBUG] Error processing premium_tier: {e}, defaulting to 0")
                 premium_tier = 0
-                logger.warning(f"[TIER_DEBUG] Premium tier is None for guild {guild_id}, defaulting to 0")
-            else:
-                # Try direct conversion as last resort
-                premium_tier = int(self.premium_tier)
-                
-            logger.info(f"[TIER_DEBUG] Guild {guild_id}: Converted premium_tier: {premium_tier}")
-        except (ValueError, TypeError) as e:
-            logger.error(f"[TIER_DEBUG] Type conversion error for premium_tier={self.premium_tier}, error: {str(e)}")
-            premium_tier = 0
-            
+        
         # CRITICAL FIX: Special handling for tier 4 (highest tier) - always grant access to all features
         if premium_tier >= 4:
             logger.info(f"[TIER_DEBUG] Automatic access granted to '{feature_name}' for guild {guild_id} with tier {premium_tier} (highest tier)")
             return True
+        
+        # CRITICAL FIX: Special handling for 'stats' feature - this is a commonly used feature
+        # that should be available for tier 1 or higher
+        if feature_name in ['stats', 'basic_stats', 'leaderboards']:
+            min_tier_required = 1  # Ensure these are available at tier 1+
+            has_access = premium_tier >= min_tier_required
+            logger.info(f"[TIER_DEBUG] Special case for '{feature_name}': tier {premium_tier} >= required {min_tier_required}? {has_access}")
+            if has_access:
+                return True
         
         # Method 1: Check using direct PREMIUM_FEATURES mapping (most efficient)
         # This implements tier inheritance by checking if current tier >= required tier
