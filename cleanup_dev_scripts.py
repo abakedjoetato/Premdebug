@@ -206,7 +206,17 @@ def cleanup_dev_scripts(dry_run: bool = False) -> Tuple[List[str], List[str]]:
                             backup_path = os.path.join(backup_dir, rel_path)
                             os.makedirs(os.path.dirname(backup_path), exist_ok=True)
                             shutil.copy2(file_path, backup_path)
-                            os.remove(file_path)
+                            try:
+                                os.remove(file_path)
+                                print(f"Successfully deleted: {file_path}")
+                            except Exception as e:
+                                print(f"Failed to delete {file_path}: {e}")
+                                # Try force delete
+                                try:
+                                    os.unlink(file_path)
+                                    print(f"Force deleted using unlink: {file_path}")
+                                except Exception as unlink_error:
+                                    print(f"Even force delete failed for {file_path}: {unlink_error}")
     
     return deleted_files, preserved_files
 
