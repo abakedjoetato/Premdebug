@@ -787,8 +787,7 @@ class Guild(BaseModel):
                 document["_id"] = result.inserted_id
                 return cls.create_from_db_document(document, db)
         except Exception as e:
-            logger.error(f"```text
-Error creating guild: {e}")
+            logger.error(f"Error creating guild: {e}")
 
         return None
 
