@@ -848,6 +848,92 @@ class Player(BaseModel):
     def __repr__(self) -> str:
         """Detailed string representation"""
         return f"Player(id={self.player_id}, name={self.name}, server={self.server_id}, k={self.kills}, d={self.deaths})"
+        
+    async def get_detailed_stats(self) -> Dict[str, Any]:
+        """Get detailed player statistics, including nemesis and prey relationships
+        
+        Returns:
+            Dict containing player statistics
+        """
+        # Start with basic stats from the model
+        stats = {
+            "player_id": self.player_id,
+            "name": self.name,
+            "server_id": self.server_id,
+            "kills": self.kills,
+            "deaths": self.deaths,
+            "suicides": self.suicides,
+            "headshots": self.headshots,
+            "kdr": self.kd_ratio,
+            "longest_shot": self.longest_shot,
+            "highest_killstreak": getattr(self, "highest_killstreak", 0),
+            "current_killstreak": getattr(self, "current_killstreak", 0),
+            "last_seen": self.last_seen,
+            "active": self.active,
+            "ranks": getattr(self, "ranks", {}),
+            "average_lifetime": getattr(self, "average_lifetime", 0),
+            "weapons": getattr(self, "weapons", {})
+        }
+        
+        # Get nemesis and prey relationships if available
+        try:
+            # Import here to avoid circular imports
+            from models.rivalry import Rivalry
+            
+            # Get player's rivalries
+            rivalries = await Rivalry.get_for_player(self.db, self.player_id, None, self.server_id)
+            
+            # Initialize nemesis and prey data
+            nemesis_data = None
+            prey_data = None
+            
+            # Find nemesis (player who kills this player the most)
+            max_deaths_to = 0
+            max_deaths_to_player = None
+            
+            # Find prey (player who this player kills the most)
+            max_kills_of = 0
+            max_kills_of_player = None
+            
+            for rivalry in rivalries:
+                # Get stats from this rivalry
+                rivalry_stats = await rivalry.get_stats_for_player(self.player_id)
+                kills = rivalry_stats.get("kills", 0)
+                deaths = rivalry_stats.get("deaths", 0)
+                opponent_id = rivalry_stats.get("opponent_id")
+                opponent_name = rivalry_stats.get("opponent_name", "Unknown")
+                
+                # Check if this is a potential nemesis
+                if deaths > max_deaths_to:
+                    max_deaths_to = deaths
+                    max_deaths_to_player = {
+                        "player_id": opponent_id,
+                        "name": opponent_name,
+                        "kills": deaths  # From opponent's perspective
+                    }
+                
+                # Check if this is a potential prey
+                if kills > max_kills_of:
+                    max_kills_of = kills
+                    max_kills_of_player = {
+                        "player_id": opponent_id,
+                        "name": opponent_name,
+                        "deaths": kills  # From opponent's perspective
+                    }
+            
+            # Only set nemesis if they've killed the player at least 3 times
+            if max_deaths_to >= 3:
+                stats["nemesis"] = max_deaths_to_player
+            
+            # Only set prey if the player has killed them at least 3 times
+            if max_kills_of >= 3:
+                stats["prey"] = max_kills_of_player
+                
+        except Exception as e:
+            logger.error(f"Error getting nemesis/prey relationships for player {self.player_id}: {e}")
+            # Continue without the nemesis/prey data
+        
+        return stats
 
     @classmethod
     async def get_by_name(
@@ -878,14 +964,11 @@ class Player(BaseModel):
         """Get all players for a server
 
         Args:
-            db: Database connection```python
+            db: Database connection
             server_id: Server ID
 
         Returns:
-            Listserver_id: Server ID
-
-        Returns:
-            List
+            List of Player objects
         """
         players = []
         cursor = db.players.find({"server_id": server_id})
@@ -894,6 +977,82 @@ class Player(BaseModel):
             if player is not None:
                 players.append(player)
         return players
+        
+    @classmethod
+    async def get_leaderboard(cls, db, server_id: str, stat_type: str = "kills", limit: int = 10) -> List[Dict[str, Any]]:
+        """Get leaderboard for a specific statistic
+        
+        Args:
+            db: Database connection
+            server_id: Server ID
+            stat_type: Type of statistic to rank by (kills, deaths, kdr, etc.)
+            limit: Maximum number of players to return
+            
+        Returns:
+            List of player data dictionaries
+        """
+        # Define valid stat types and their sort direction
+        valid_stats = {
+            "kills": -1,
+            "deaths": -1,
+            "suicides": -1,
+            "kdr": -1,  # We'll handle this specially
+            "headshots": -1,
+            "longest_shot": -1,
+            "highest_killstreak": -1
+        }
+        
+        if stat_type not in valid_stats:
+            stat_type = "kills"  # Default to kills
+            
+        sort_direction = valid_stats[stat_type]
+        
+        # KDR needs special handling
+        if stat_type == "kdr":
+            # For KDR, we need to aggregate and calculate it
+            pipeline = [
+                {"$match": {"server_id": server_id}},
+                {"$addFields": {
+                    "kdr": {
+                        "$cond": [
+                            {"$eq": ["$deaths", 0]},
+                            "$kills",
+                            {"$divide": ["$kills", "$deaths"]}
+                        ]
+                    }
+                }},
+                {"$sort": {"kdr": sort_direction, "kills": -1}},
+                {"$limit": limit}
+            ]
+            
+            cursor = db[cls.collection_name].aggregate(pipeline)
+        else:
+            # For other stats, we can sort directly
+            query = {"server_id": server_id}
+            cursor = db[cls.collection_name].find(query).sort(stat_type, sort_direction).limit(limit)
+        
+        # Collect results
+        results = []
+        async for doc in cursor:
+            player = cls.from_document(doc)
+            if player:
+                # Build a simplified player data dict
+                player_data = {
+                    "player_id": player.player_id,
+                    "name": player.name,
+                    "display_name": getattr(player, "display_name", player.name),
+                    "kills": player.kills,
+                    "deaths": player.deaths,
+                    "suicides": player.suicides,
+                    "kdr": player.kd_ratio,
+                    "headshots": getattr(player, "headshots", 0),
+                    "longest_shot": getattr(player, "longest_shot", 0),
+                    "highest_killstreak": getattr(player, "highest_killstreak", 0),
+                    "last_seen": player.last_seen
+                }
+                results.append(player_data)
+                
+        return results
 
     def _sanitize_player_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """

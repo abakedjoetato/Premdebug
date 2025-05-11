@@ -186,6 +186,213 @@ class Rivalry(BaseModel):
             rivalries.append(cls(db, doc))
 
         return rivalries
+        
+    @classmethod
+    async def get_for_player(cls, db, player_id: str, guild_id: Optional[Union[str, int]] = None, server_id: Optional[str] = None, limit: int = 10) -> List['Rivalry']:
+        """
+        Get all rivalries for a player (alternate method for find_for_player)
+        
+        This is an alias for find_for_player that allows for None guild_id
+
+        Args:
+            db: Database connection
+            player_id: Player ID
+            guild_id: Optional Discord guild ID
+            server_id: Optional game server ID
+            limit: Maximum number of rivalries to return
+
+        Returns:
+            List of Rivalry instances
+        """
+        # Build query
+        query = {
+            "$or": [
+                {"player1_id": player_id},
+                {"player2_id": player_id}
+            ]
+        }
+
+        # Add guild_id if provided
+        if guild_id is not None:
+            query["guild_id"] = str(guild_id)
+            
+        # Add server_id if provided
+        if server_id is not None:
+            query["server_id"] = server_id
+
+        # Find rivalries
+        cursor = db[cls.collection_name].find(query).sort("intensity", -1).limit(limit)
+
+        rivalries = []
+        async for doc in cursor:
+            rivalries.append(cls(db, doc))
+
+        return rivalries
+        
+    @classmethod
+    async def get_top_rivalries(cls, db, server_id: str, limit: int = 10) -> List['Rivalry']:
+        """
+        Get top rivalries for a server based on intensity
+        
+        Args:
+            db: Database connection
+            server_id: Server ID
+            limit: Maximum number of rivalries to return
+            
+        Returns:
+            List of Rivalry instances
+        """
+        # Build query
+        query = {
+            "server_id": server_id,
+            "total_kills": {"$gt": 5}  # Only include significant rivalries
+        }
+        
+        # Find rivalries, sorted by intensity in descending order
+        cursor = db[cls.collection_name].find(query).sort("intensity", -1).limit(limit)
+        
+        rivalries = []
+        async for doc in cursor:
+            rivalries.append(cls(db, doc))
+            
+        return rivalries
+        
+    @classmethod
+    async def get_closest_rivalries(cls, db, server_id: str, limit: int = 10) -> List['Rivalry']:
+        """
+        Get closest rivalries for a server based on kill difference
+        
+        Args:
+            db: Database connection
+            server_id: Server ID
+            limit: Maximum number of rivalries to return
+            
+        Returns:
+            List of Rivalry instances
+        """
+        # Build pipeline for aggregation
+        pipeline = [
+            {"$match": {
+                "server_id": server_id,
+                "total_kills": {"$gt": 5}  # Only include significant rivalries
+            }},
+            {"$addFields": {
+                "kill_difference": {"$abs": {"$subtract": ["$player1_kills", "$player2_kills"]}}
+            }},
+            {"$sort": {"kill_difference": 1, "total_kills": -1}},  # Sort by closest matchup, then by most action
+            {"$limit": limit}
+        ]
+        
+        # Execute aggregation
+        cursor = db[cls.collection_name].aggregate(pipeline)
+        
+        rivalries = []
+        async for doc in cursor:
+            rivalries.append(cls(db, doc))
+            
+        return rivalries
+    
+    @classmethod
+    async def get_recent_rivalries(cls, db, server_id: str, limit: int = 10, days: int = 7) -> List['Rivalry']:
+        """
+        Get recent rivalries for a server based on last kill timestamp
+        
+        Args:
+            db: Database connection
+            server_id: Server ID
+            limit: Maximum number of rivalries to return
+            days: Number of days to look back
+            
+        Returns:
+            List of Rivalry instances
+        """
+        # Calculate cutoff date
+        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        
+        # Build query
+        query = {
+            "server_id": server_id,
+            "last_kill_timestamp": {"$gte": cutoff_date}
+        }
+        
+        # Find rivalries, sorted by last kill timestamp in descending order
+        cursor = db[cls.collection_name].find(query).sort("last_kill_timestamp", -1).limit(limit)
+        
+        rivalries = []
+        async for doc in cursor:
+            rivalries.append(cls(db, doc))
+            
+        return rivalries
+        
+    @classmethod
+    async def get_by_players(cls, db, server_id: str, player1_id: str, player2_id: str) -> Optional['Rivalry']:
+        """
+        Get a rivalry between two specific players
+        
+        Args:
+            db: Database connection
+            server_id: Server ID
+            player1_id: First player ID
+            player2_id: Second player ID
+            
+        Returns:
+            Rivalry instance if found, otherwise None
+        """
+        # Build query to search for rivalry in both directions
+        query = {
+            "server_id": server_id,
+            "$or": [
+                {"player1_id": player1_id, "player2_id": player2_id},
+                {"player1_id": player2_id, "player2_id": player1_id}
+            ]
+        }
+        
+        # Find rivalry
+        doc = await db[cls.collection_name].find_one(query)
+        
+        # Return rivalry instance if found
+        if doc:
+            return cls(db, doc)
+        
+        return None
+        
+    @classmethod
+    async def record_kill(
+        cls, 
+        db, 
+        server_id: str, 
+        killer_id: str, 
+        victim_id: str, 
+        killer_name: Optional[str] = None, 
+        victim_name: Optional[str] = None, 
+        weapon: Optional[str] = None, 
+        headshot: bool = False,
+        location: Optional[str] = None,
+        guild_id: Optional[Union[str, int]] = None
+    ) -> 'Rivalry':
+        """
+        Record a kill between two players, creating or updating a rivalry
+        
+        Args:
+            db: Database connection
+            server_id: Game server ID
+            killer_id: ID of the killer
+            victim_id: ID of the victim
+            killer_name: Name of the killer (optional)
+            victim_name: Name of the victim (optional)
+            weapon: Weapon used for the kill (optional)
+            headshot: Whether the kill was a headshot (optional)
+            location: Location on the map where the kill occurred (optional)
+            guild_id: Discord guild ID (optional)
+            
+        Returns:
+            Updated or created Rivalry instance
+        """
+        # Find existing rivalry or create a new one
+        rivalry, created = await cls.find_or_create(db, killer_id, victim_id, guild_id, server_id)
+        
+        # Record the kill using the instance method
+        return await rivalry.record_kill(killer_id, victim_id, weapon, headshot)
 
     async def update(self, data: Dict[str, Any]) -> 'Rivalry':
         """
@@ -417,3 +624,87 @@ class Rivalry(BaseModel):
             return self.data["player2_id"]
         else:
             return None  # Equal kills
+            
+    async def get_stats_for_player(self, player_id: str) -> Dict[str, Any]:
+        """
+        Get rivalry statistics from the perspective of a specific player
+        
+        Args:
+            player_id: Player ID to get stats for
+            
+        Returns:
+            Dictionary of rivalry statistics
+            
+        Raises:
+            ValueError: If player is not part of this rivalry
+        """
+        # Check if player is part of this rivalry
+        if player_id != self.data["player1_id"] and player_id != self.data["player2_id"]:
+            raise ValueError(f"Player {player_id} is not part of this rivalry")
+            
+        # Determine if this player is player1 or player2
+        is_player1 = player_id == self.data["player1_id"]
+        
+        # Get the opponent ID and name
+        if is_player1:
+            opponent_id = self.data["player2_id"]
+            # Fetch opponent name from database if available
+            opponent_name = "Unknown"
+            try:
+                player_doc = await self.db.players.find_one({"player_id": opponent_id})
+                if player_doc is not None:
+                    opponent_name = player_doc.get("player_name", "Unknown")
+            except Exception as e:
+                logger.error(f"Error fetching opponent name: {e}")
+                opponent_name = "Unknown"
+            
+            # Get kill stats
+            kills = self.data.get("player1_kills", 0)
+            deaths = self.data.get("player2_kills", 0)
+            headshots = self.data.get("player1_headshots", 0)
+            weapons = self.data.get("player1_weapons", {})
+        else:
+            opponent_id = self.data["player1_id"]
+            # Fetch opponent name from database if available
+            opponent_name = "Unknown"
+            try:
+                player_doc = await self.db.players.find_one({"player_id": opponent_id})
+                if player_doc is not None:
+                    opponent_name = player_doc.get("player_name", "Unknown")
+            except Exception as e:
+                logger.error(f"Error fetching opponent name: {e}")
+                opponent_name = "Unknown"
+            
+            # Get kill stats
+            kills = self.data.get("player2_kills", 0)
+            deaths = self.data.get("player1_kills", 0)
+            headshots = self.data.get("player2_headshots", 0)
+            weapons = self.data.get("player2_weapons", {})
+        
+        # Calculate KD ratio
+        kd_ratio = kills / max(deaths, 1)
+        
+        # Determine if player is leading
+        is_leading = kills > deaths
+        
+        # Calculate intensity score
+        intensity_score = self.data.get("intensity", 0)
+        
+        # Compile stats
+        stats = {
+            "player_id": player_id,
+            "opponent_id": opponent_id,
+            "opponent_name": opponent_name,
+            "kills": kills,
+            "deaths": deaths,
+            "headshots": headshots,
+            "kd_ratio": kd_ratio,
+            "is_leading": is_leading,
+            "intensity_score": intensity_score,
+            "weapons": weapons,
+            "last_kill": self.data.get("last_kill_timestamp"),
+            "last_weapon": self.data.get("last_killer_weapon"),
+            "total_kills": kills + deaths
+        }
+        
+        return stats
