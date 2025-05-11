@@ -107,7 +107,7 @@ def with_operation_tracking(op_name: str, timeout_minutes: int = 5):
 
                 # Log long-running operations for performance monitoring
                 if elapsed > 5:  # Log operations taking more than 5 seconds
-                    logger.warning(f"Long-running operation {operation_id} for server {self.server_id} took {elapsed:.2f}s")
+                    logger.debug(f"Long-running operation {operation_id} for server {self.server_id} took {elapsed:.2f}s")
 
                 return result
             except Exception as e:
@@ -307,7 +307,7 @@ async def get_sftp_client(
 
     # Create connection key
     if server_id is None:
-        logger.warning("SFTP client requested without server_id, this prevents proper isolation")
+        logger.debug("SFTP client requested without server_id, this prevents proper isolation")
         # Generate a unique ID to avoid conflicts
         server_id = f"anonymous_{random.randint(1000, 9999)}"
 
@@ -429,7 +429,7 @@ class SFTPManager:
             # This is the authoritative source for numeric IDs, and should be used whenever possible
             if server_id is not None and server_id in KNOWN_SERVERS:
                 numeric_id = KNOWN_SERVERS[server_id]
-                logger.info(f"SFTPClient using known numeric ID '{numeric_id}' for path construction instead of '{server_id}'")
+                logger.debug(f"SFTPClient using known numeric ID \'{numeric_id}\' for path construction instead of \'{server_id}\'")
                 self.original_server_id = numeric_id
                 
             # Priority 2: If original_server_id is provided and is numeric, use it directly
@@ -500,7 +500,7 @@ class SFTPManager:
             
             # Ensure original_server_id is a string
             self.original_server_id = str(self.original_server_id)
-            logger.info(f"Using original server ID '{self.original_server_id}' for path construction")
+            logger.debug(f"Using original server ID \'{self.original_server_id}\' for path construction")
             
         except (ImportError, Exception) as e:
             # If server_identity module import fails, set a safe default
@@ -531,7 +531,7 @@ class SFTPManager:
         
         # Always log the server ID being used for path construction
         if self.original_server_id != server_id:
-            logger.info(f"Using original server ID '{self.original_server_id}' for path construction instead of standardized ID '{server_id}'")
+            logger.debug(f"Using original server ID \'{self.original_server_id}\' for path construction instead of standardized ID \'{server_id}\'")
         else:
             logger.info(f"Using server ID '{server_id}' for path construction")
         self.client = None
@@ -1068,7 +1068,7 @@ class SFTPManager:
                 if hasattr(self, 'original_server_id') and self.original_server_id:
                     if str(self.original_server_id).isdigit():
                         path_server_id = self.original_server_id
-                        logger.info(f"Using numeric original_server_id '{path_server_id}' for path construction")
+                        logger.debug(f"Using numeric original_server_id \'{path_server_id}\' for path construction")
                     else:
                         # Not numeric, but still prefer original_server_id over server_id
                         path_server_id = self.original_server_id
@@ -1152,7 +1152,7 @@ class SFTPManager:
                             continue  # Try next path
 
                         if file_exists:
-                            logger.info(f"Found Deadside.log at: {path}")
+                            logger.debug(f"Found Deadside.log at: {path}")
                             return path
                     except Exception as e:
                         logger.debug(f"Log file not found at {path}: {str(e)}")
@@ -1706,7 +1706,7 @@ class SFTPManager:
                     return None
 
                 # Log success
-                logger.info(f"Downloaded {len(data)} bytes from file {path}")
+                logger.debug(f"Downloaded {len(data)} bytes from file {path}")
                 return data
 
             except Exception as e:
@@ -1960,7 +1960,7 @@ class SFTPClient:
             self.last_activity = datetime.now()
             elapsed = (datetime.now() - start_time).total_seconds()
 
-            logger.info(f"Connected to SFTP server: {self.connection_id} in {elapsed:.2f}s")
+            logger.debug(f"Connected to SFTP server: {self.connection_id} in {elapsed:.2f}s")
             
             # Test connection with simple operation
             try:
@@ -2221,7 +2221,7 @@ class SFTPClient:
             try:
                 import asyncssh
                 if isinstance(self._sftp_client, asyncssh.SFTPClient):
-                    logger.info(f"Detected AsyncSSH SFTP client, using optimized methods")
+                    logger.debug(f"Detected AsyncSSH SFTP client, using optimized methods")
                     try:
                         # Try the direct AsyncSSH method for reading files
                         # In AsyncSSH 2.x, the method is called 'open', not 'readfile'
@@ -2230,7 +2230,7 @@ class SFTPClient:
                         self.last_activity = datetime.now()
                         if isinstance(content, str):
                             content = content.encode('utf-8')
-                        logger.info(f"Downloaded {remote_path} using AsyncSSH open+read ({len(content)} bytes)")
+                        logger.debug(f"Downloaded {remote_path} using AsyncSSH open+read ({len(content)} bytes)")
                         return content
                     except Exception as ssh_err:
                         logger.warning(f"AsyncSSH readfile failed: {ssh_err}, trying other methods")
@@ -2720,7 +2720,7 @@ class SFTPClient:
                     return None
 
                 await self._sftp_client.stat(deadside_log)
-                logger.info(f"Found Deadside.log at: {deadside_log}")
+                logger.debug(f"Found Deadside.log at: {deadside_log}")
                 return deadside_log
             except Exception as e:
                 logger.warning(f"Deadside.log not found in {base_path}: {e}")
@@ -2821,16 +2821,16 @@ class SFTPClient:
                         logger.debug(f"Found {len(entries)} entries in {directory}")
                         break
                     elif attempt < max_attempts:
-                        logger.warning(f"No entries found in {directory}, retry attempt {attempt}/{max_attempts}")
+                        logger.debug(f"No entries found in {directory}, retry attempt {attempt}/{max_attempts}")
                         await asyncio.sleep(0.5)  # Brief delay before retry
                 except Exception as list_err:
-                    logger.warning(f"Failed to list directory {directory} (attempt {attempt}/{max_attempts}): {list_err}")
+                    logger.debug(f"Failed to list directory {directory} (attempt {attempt}/{max_attempts}): {list_err}")
                     if attempt < max_attempts:
                         # Try to reconnect before retrying
                         await self.ensure_connected()
                         await asyncio.sleep(0.5)  # Brief delay before retry
                     else:
-                        logger.error(f"All attempts to list directory {directory} failed")
+                        logger.debug(f"All attempts to list directory {directory} failed")
                         return result
 
             # Check if we ultimately found any entries
@@ -3097,7 +3097,7 @@ class SFTPClient:
                     except Exception as e:
                         logger.debug(f"Error checking if {entry_path} is a directory: {e}")
             except Exception as e:
-                logger.warning(f"Error listing directory {directory}: {e}")
+                logger.debug(f"Error listing directory {directory}: {e}")
 
             if map_directories:
                 logger.debug(f"Found {len(map_directories)} map directories")
@@ -3478,7 +3478,7 @@ class SFTPClient:
                         all_csv_files.append(full_path)
 
             except Exception as list_err:
-                logger.warning(f"Error listing directory {directory}: {list_err}")
+                logger.debug(f"Error listing directory {directory}: {list_err}")
 
             # If no map directories found, or as additional search, use standard pattern matching
             if not all_csv_files:
@@ -3510,7 +3510,7 @@ class SFTPClient:
 
             # Remove duplicates and sort files by name
             unique_files = list(set(all_csv_files))
-            logger.info(f"Total CSV files found after deduplication: {len(unique_files)} (from {len(all_csv_files)} total)")
+            logger.debug(f"Total CSV files found after deduplication: {len(unique_files)} (from {len(all_csv_files)} total)")
 
             # Log sample of found files
             if unique_files:
@@ -3689,7 +3689,7 @@ class SFTPClient:
                     path_server_id = extracted_id
                     
             # Log which server ID we're using for path construction
-            logger.info(f"Using numeric original_server_id '{path_server_id}' for path construction")
+            logger.debug(f"Using numeric original_server_id \'{path_server_id}\' for path construction")
 
             # Build base path with hostname_serverid structure
             server_dir = f"{self.hostname.split(':')[0]}_{path_server_id}"
@@ -3697,7 +3697,7 @@ class SFTPClient:
 
             # Check if the log file exists directly
             if await self.exists(log_file_path):
-                logger.info(f"Found log file at: {log_file_path}")
+                logger.debug(f"Found log file at: {log_file_path}")
                 return log_file_path
 
             # Define common map subdirectory names to check directly (prioritize these)

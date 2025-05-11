@@ -377,7 +377,7 @@ class LogParser:
         # Use standardized log path structure with NUMERIC server ID, not UUID
         clean_hostname = hostname.split(':')[0] if hostname else "server"
         self.base_path = os.path.join("/", f"{clean_hostname}_{self.original_server_id}", "Logs")
-        logger.info(f"LogParser initialized with base_path: {self.base_path} (using original_server_id: {self.original_server_id})")
+        logger.debug(f"LogParser initialized with base_path: {self.base_path} (using original_server_id: {self.original_server_id})")
         
         self.last_processed_timestamp = None
         self.max_player_count = None

@@ -536,7 +536,7 @@ class CSVProcessorCog(commands.Cog):
                                     map_csv_files = await sftp.list_files(map_dir, csv_pattern)
 
                                     if map_csv_files:
-                                        logger.info(f"Found {len(map_csv_files)} CSV files in map directory {map_dir}")
+                                        logger.debug(f"Found {len(map_csv_files)} CSV files in map directory {map_dir}")
                                         # Convert to full paths
                                         map_full_paths = [
                                             os.path.join(map_dir, f) for f in map_csv_files
@@ -677,7 +677,7 @@ class CSVProcessorCog(commands.Cog):
                                 csv_files = verified_files
                                 full_path_csv_files = verified_full_paths
                                 path_found = search_path
-                                logger.info(f"Found {len(csv_files)} CSV files in {search_path}")
+                                logger.debug(f"Found {len(csv_files)} CSV files in {search_path}")
 
                                 # Print the first few file names for debugging
                                 if csv_files:
@@ -727,7 +727,7 @@ class CSVProcessorCog(commands.Cog):
                                     # Try with higher max_depth to explore deeper into the file structure
                                     root_csvs = await sftp.find_csv_files(root_path, recursive=True, max_depth=8)
                                     if root_csvs:
-                                        logger.info(f"Found {len(root_csvs)} CSV files in deep search from {root_path}")
+                                        logger.debug(f"Found {len(root_csvs)} CSV files in deep search from {root_path}")
                                         # Log a sample of the files found
                                         if len(root_csvs) > 0:
                                             sample = root_csvs[:5] if len(root_csvs) > 5 else root_csvs
@@ -809,7 +809,7 @@ class CSVProcessorCog(commands.Cog):
                                             csv_files = path_files
                                             path_found = search_path
                                             full_path_csv_files = [os.path.join(search_path, f) for f in csv_files]
-                                            logger.info(f"Found {len(csv_files)} CSV files in {search_path} using direct check")
+                                            logger.debug(f"Found {len(csv_files)} CSV files in {search_path} using direct check")
                                             break
                                 except Exception as direct_err:
                                     pass  # Silently continue, we're trying lots of paths

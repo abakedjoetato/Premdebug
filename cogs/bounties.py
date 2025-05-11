@@ -60,7 +60,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
             try:
                 db = await get_db()
                 if db is None or not isinstance(db, DatabaseManager) or not db._connected:
-                    logger.warning("Database not properly initialized, skipping expired bounties check")
+                    logger.debug("Database not properly initialized, skipping expired bounties check")
                     return
 
                 # Explicitly ensure DB connection before proceeding
@@ -86,7 +86,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
             try:
                 db = await get_db()
                 if db is None or not isinstance(db, DatabaseManager) or not db._connected:
-                    logger.warning("Database not properly initialized, skipping auto bounties check")
+                    logger.debug("Database not properly initialized, skipping auto bounties check")
                     return
 
                 # Explicitly ensure DB connection before proceeding

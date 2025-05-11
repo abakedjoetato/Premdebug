@@ -90,6 +90,15 @@ class CSVProcessorCog(commands.Cog):
         self.is_historical_parsing = False
         self.servers_with_active_historical_parse = set()  # Set of server IDs with ongoing historical parse
         
+        # NEW: For tracking which files have been processed to avoid processing previous day's file repeatedly
+        self.processed_files_history = {}  # server_id -> set of filenames
+
+        # NEW: For adaptive processing frequency
+        self.server_activity = {}  # server_id -> {"last_active": datetime, "empty_checks": int}
+        self.default_check_interval = 5  # Default: check every 5 minutes
+        self.max_check_interval = 30  # Maximum: check every 30 minutes
+        self.inactive_threshold = 3  # After 3 empty checks, consider inactive
+        
         # Initialize file tracking properties
         self.map_csv_files_found = []
         self.map_csv_full_paths_found = []
@@ -235,6 +244,49 @@ class CSVProcessorCog(commands.Cog):
             
     async def _save_state(self):
         """Save current CSV processing state to database for all servers"""
+
+    async def _check_server_activity(self, server_id, events_found):
+        """Track server activity for adaptive processing
+
+        Args:
+            server_id: The server ID to check
+            events_found: Number of events found in current check
+            
+        Returns:
+            int: Recommended minutes to wait until next check
+        """
+        from datetime import datetime
+        now = datetime.utcnow()
+        
+        # Initialize server activity tracking if needed
+        if server_id not in self.server_activity:
+            self.server_activity[server_id] = {
+                "last_active": now,
+                "empty_checks": 0
+            }
+        
+        # Update activity metrics
+        if events_found > 0:
+            # Server is active, reset empty check counter
+            self.server_activity[server_id]["last_active"] = now
+            self.server_activity[server_id]["empty_checks"] = 0
+            return self.default_check_interval
+        else:
+            # No events found, increment empty check counter
+            self.server_activity[server_id]["empty_checks"] += 1
+            
+            # Calculate recommended interval based on inactivity
+            empty_checks = self.server_activity[server_id]["empty_checks"]
+            if empty_checks >= self.inactive_threshold:
+                # Scale the interval based on how many empty checks we've had
+                interval = min(self.default_check_interval + ((empty_checks - self.inactive_threshold + 1) * 5), 
+                              self.max_check_interval)
+                logger.debug(f"Server {server_id} has had {empty_checks} empty checks, next check in {interval} minutes")
+                return interval
+            
+        # Default to standard interval
+        return self.default_check_interval
+
         try:
             # Make sure we have a DB connection
             if self.bot.db is None:
@@ -336,7 +388,7 @@ class CSVProcessorCog(commands.Cog):
                     return
 
             # Only log server count, not details (reduce log spam)
-            logger.info(f"Processing CSV files for {len(server_configs)} servers")
+            logger.debug(f"Processing CSV files for {len(server_configs)} servers")
 
             # BATCH PROCESSING: Group servers for efficient processing
             # Process servers in groups of 3 to balance load
@@ -484,10 +536,9 @@ class CSVProcessorCog(commands.Cog):
                 # Add regular files and map files for the total
                 total_found = files_found + map_files_count
                 total_files_found = files_found + map_files_count
-                logger.info(f"CSV Processing: Final files found count = {total_files_found} (normal files: {files_found}, map files: {map_files_count})")
-                logger.info(f"CSV Processing: Files processed: {files_count}, Events processed: {events_count}")
-
-                logger.info(f"CSV processing completed. Files Found={total_found}, Files Processed={files_processed}, Events={events_processed}")
+                logger.debug(f"CSV Processing: Final files found count = {total_files_found} (normal files: {files_found}, map files: {map_files_count})")
+                
+                # Only log the final summary at INFO level
                 logger.info(f"CSV processing completed in {duration:.2f} seconds. Processed {files_count} CSV files with {events_count} events.")
                 
                 # Save final state to database to ensure it persists between restarts
@@ -733,7 +784,7 @@ class CSVProcessorCog(commands.Cog):
                 if is_known or numeric_id != original_server_id:
                     # Only log if we're changing the ID
                     if is_known:
-                        logger.info(f"Using known numeric ID '{numeric_id}' for server {server_id}")
+                        logger.debug(f"Using known numeric ID \'{numeric_id}\' for server {server_id}")
                     else:
                         logger.info(f"Using derived numeric ID '{numeric_id}' for server {server_id}")
                     original_server_id = numeric_id
@@ -849,7 +900,7 @@ class CSVProcessorCog(commands.Cog):
 
                     # Test connection by listing root directory
                     await sftp.listdir('/')
-                    logger.info(f"SFTP connection successful for server {server_id}")
+                    logger.debug(f"SFTP connection successful for server {server_id}")
                     break
 
                 except asyncio.TimeoutError:
@@ -915,7 +966,7 @@ class CSVProcessorCog(commands.Cog):
                 # Use the identified consistent ID
                 if is_known or numeric_id != path_server_id:
                     if is_known:
-                        logger.info(f"Using known numeric ID '{numeric_id}' for server {server_id}")
+                        logger.debug(f"Using known numeric ID \'{numeric_id}\' for server {server_id}")
                     else:
                         logger.info(f"Using identified numeric ID '{numeric_id}' from server {server_id}")
                     path_server_id = numeric_id
@@ -927,7 +978,7 @@ class CSVProcessorCog(commands.Cog):
 
                 # Build server directory using the determined path_server_id
                 server_dir = f"{config.get('hostname', 'server').split(':')[0]}_{path_server_id}"
-                logger.info(f"Using server directory: {server_dir} with ID {path_server_id}")
+                logger.debug(f"Using server directory: {server_dir} with ID {path_server_id}")
                 logger.debug(f"Using server directory: {server_dir}")
 
                 # Initialize variables to avoid "possibly unbound" warnings
@@ -1112,8 +1163,8 @@ class CSVProcessorCog(commands.Cog):
                                         self.found_map_files = True
                                         
                                         # Log detailed information for debugging
-                                        logger.info(f"Added {len(map_full_paths)} CSV files from map directory {map_dir} to tracking lists")
-                                        logger.info(f"Total tracked map files now: {len(self.all_map_csv_files)}")
+                                        logger.debug(f"Added {len(map_full_paths)} CSV files from map directory {map_dir} to tracking lists")
+                                        logger.debug(f"Total tracked map files now: {len(self.all_map_csv_files)}")
                                     else:
                                         # Try with each date format pattern
                                         for pattern in date_format_patterns:
@@ -1183,7 +1234,7 @@ class CSVProcessorCog(commands.Cog):
                     if not hasattr(self, 'found_csv_files_status_updated'):
                         self.found_csv_files_status_updated = True
                     # We'll still continue with additional search to ensure no files are missed
-                    logger.info(f"Found {len(self.map_csv_files_found)} CSV files in map directories, continuing with additional search to find more files if available")
+                    logger.debug(f"Found {len(self.map_csv_files_found)} CSV files in map directories, continuing with additional search to find more files if available")
                 elif not self.found_map_files:
                     # Only log this if we haven't found files in previous checks
                     # CRITICAL FIX: Don't report "No CSV files found" since we'll check more locations
@@ -1278,7 +1329,7 @@ class CSVProcessorCog(commands.Cog):
                                 csv_files = verified_files
                                 full_path_csv_files = verified_full_paths
                                 path_found = search_path
-                                logger.info(f"Found {len(csv_files)} CSV files in {search_path}")
+                                logger.debug(f"Found {len(csv_files)} CSV files in {search_path}")
 
                                 # Print the first few file names for debugging
                                 if csv_files:
@@ -1294,7 +1345,7 @@ class CSVProcessorCog(commands.Cog):
                     if not csv_files and not self.found_map_files:
                         logger.info(f"No CSV files found in predefined paths, trying recursive search...")
                     elif not csv_files and self.found_map_files:
-                        logger.info(f"No additional CSV files found in predefined paths, but we already found files in map directories. Continuing with recursive search for thoroughness...")
+                        logger.debug(f"No additional CSV files found in predefined paths, but we already found files in map directories. Continuing with recursive search for thoroughness...")
 
                         # Try first from server root, then the root directory of the server
                         root_paths = [
@@ -1330,7 +1381,7 @@ class CSVProcessorCog(commands.Cog):
                                     # Try with higher max_depth to explore deeper into the file structure
                                     root_csvs = await sftp.find_csv_files(root_path, recursive=True, max_depth=8)
                                     if root_csvs:
-                                        logger.info(f"Found {len(root_csvs)} CSV files in deep search from {root_path}")
+                                        logger.debug(f"Found {len(root_csvs)} CSV files in deep search from {root_path}")
                                         # Log a sample of the files found
                                         if len(root_csvs) > 0:
                                             sample = root_csvs[:5] if len(root_csvs) > 5 else root_csvs
@@ -1428,7 +1479,7 @@ class CSVProcessorCog(commands.Cog):
                                             csv_files = path_files
                                             path_found = search_path
                                             full_path_csv_files = [os.path.join(search_path, f) for f in csv_files]
-                                            logger.info(f"Found {len(csv_files)} CSV files in {search_path} using direct check")
+                                            logger.debug(f"Found {len(csv_files)} CSV files in {search_path} using direct check")
                                             
                                             # Save the files we found using direct check for later processing
                                             self.map_csv_files_found.extend(csv_files)
@@ -1458,7 +1509,7 @@ class CSVProcessorCog(commands.Cog):
 
                         # CRITICAL FIX: Always use a 30-day window for processing to ensure we don't miss files
                         # This completely bypasses the memory system that can cause files to be skipped
-                        logger.warning(f"CRITICAL FIX: Overriding last processed time to ensure all files are properly processed")
+                        logger.info("Overriding last processed time for historical analysis")
                         
                         # Set processing window to last 30 days to ensure we catch all relevant files
                         last_time = datetime.now() - timedelta(days=30)
@@ -1467,8 +1518,8 @@ class CSVProcessorCog(commands.Cog):
                         # Update memory system to prevent future issues
                         self.last_processed[server_id] = last_time
                         
-                        logger.warning(f"CRITICAL FIX: Set processing window to include all files newer than {last_time_str}")
-                        logger.warning(f"CRITICAL FIX: This ensures files aren't skipped due to memory system issues")
+                        logger.debug(f"Set processing window to include all files newer than {last_time_str}")
+                        logger.debug("Ensuring consistent file processing with memory system")
 
                         # Log the cutoff time being used
                         logger.info(f"Processing files newer than: {last_time_str}")
@@ -1496,7 +1547,7 @@ class CSVProcessorCog(commands.Cog):
                         skipped_files = []
                         
                         # Log the number of files found and the cutoff date
-                        logger.warning(f"CSV Processing: Found {len(csv_files)} CSV files, timestamp cutoff: {last_time_str}")
+                        logger.debug(f"CSV Processing: Found {len(csv_files)} CSV files, timestamp cutoff: {last_time_str}")
                         
                         # CRITICAL FIX: CONSOLIDATED FILE DISCOVERY LOGIC
                         # Always ensure we have files to process by directly assigning all discovered files
@@ -1506,7 +1557,7 @@ class CSVProcessorCog(commands.Cog):
                             # Log what we're about to process
                             for f in csv_files:
                                 filename = os.path.basename(f)
-                                logger.warning(f"CSV Processing: Will process file: {filename}")
+                                logger.debug(f"CSV Processing: Will process file: {filename}")
                                 new_files.append(f)
                                 
                             # Double-check that we have files in new_files
@@ -1758,12 +1809,12 @@ class CSVProcessorCog(commands.Cog):
                         # FIXED: Implement clear distinction between historical vs killfeed processing
                         
                         # Log file counts for easier debugging
-                        logger.info(f"CSV Processing: Original csv_files: {len(csv_files)}, new_files after filtering: {len(new_files)}, sorted_files: {len(sorted_files)}")
+                        logger.debug(f"CSV Processing: Original csv_files: {len(csv_files)}, new_files after filtering: {len(new_files)}, sorted_files: {len(sorted_files)}")
                         
                         # Historical processor:
                         # - Should process ALL CSV files it finds, without any filtering
                         if is_historical_mode:
-                            logger.info(f"CSV Processing: Historical mode - will process ALL {len(csv_files)} files with ALL lines")
+                            logger.debug(f"CSV Processing: Historical mode - will process ALL {len(csv_files)} files with ALL lines")
                             # FIXED: Use sorted_files as the source since they're already chronologically ordered
                             # But if sorted_files is empty and csv_files isn't, use csv_files as fallback
                             if len(sorted_files) > 0:
@@ -1776,17 +1827,17 @@ class CSVProcessorCog(commands.Cog):
                             
                             # Reset last_processed timestamp to ensure we reprocess all files from scratch
                             if server_id in self.last_processed:
-                                logger.info(f"CSV Processing: Resetting last_processed timestamp for historical processing")
+                                logger.debug(f"CSV Processing: Resetting last_processed timestamp for historical processing")
                                 del self.last_processed[server_id]
                                 
                             # Track this historical parse to prevent simultaneous processing
                             self.servers_with_active_historical_parse.add(server_id)
-                            logger.info(f"CSV Processing: Added server {server_id} to active historical parse tracking")
+                            logger.debug(f"CSV Processing: Added server {server_id} to active historical parse tracking")
                         
                         # Killfeed processor:
                         # - Should find the newest file for each day and process only the new lines
                         else:
-                            logger.info(f"CSV Processing: Regular killfeed mode - processing newest files with incremental updates")
+                            logger.debug(f"CSV Processing: Regular killfeed mode - processing newest files with incremental updates")
                             # Group files by day
                             files_by_day = {}
                             
@@ -1796,7 +1847,7 @@ class CSVProcessorCog(commands.Cog):
                                 logger.warning("CSV Processing: Both sorted_files and new_files are empty, using csv_files")
                                 source_files = csv_files
                                 
-                            logger.info(f"CSV Processing: Using {len(source_files)} files as source for day grouping")
+                            logger.debug(f"CSV Processing: Using {len(source_files)} files as source for day grouping")
                             
                             for f in source_files:
                                 filename = os.path.basename(f)
@@ -1842,13 +1893,56 @@ class CSVProcessorCog(commands.Cog):
                                         # Sort files for this day
                                         day_files.sort(reverse=True)
                                         newest_files.append(day_files[0])
-                                        logger.info(f"CSV Processing: For day {day}, selected newest file: {os.path.basename(day_files[0])}")
+                                        logger.debug(f"CSV Processing: For day {day}, selected newest file: {os.path.basename(day_files[0])}")
                                     except Exception as e:
                                         logger.error(f"CSV Processing: Error selecting newest file for day {day}: {e}")
                                         # Add all files for this day as a fallback
                                         newest_files.extend(day_files)
                             
-                            files_to_process = newest_files
+                            # OPTIMIZATION: In regular mode, only process the newest file
+                            # And only check the previous day's file once when a new file is detected
+                            if newest_files:
+                                # Sort the newest files by date (descending)
+                                newest_files.sort(key=get_file_date, reverse=True)
+                                
+                                # Always include the most recent file
+                                most_recent_file = newest_files[0]
+                                files_to_keep = [most_recent_file]
+                                most_recent_filename = os.path.basename(most_recent_file)
+                                most_recent_date = get_file_date(most_recent_file)
+                                
+                                # Check if this is a newly created file we haven't processed before
+                                is_new_file = False
+                                if server_id in self.processed_files_history:
+                                    if most_recent_filename not in self.processed_files_history[server_id]:
+                                        is_new_file = True
+                                        logger.debug(f"CSV Processing: Detected new file: {most_recent_filename}")
+                                else:
+                                    # First time seeing this server, consider it new
+                                    self.processed_files_history[server_id] = set()
+                                    is_new_file = True
+                                
+                                # If it's a new file, also include the previous day's file to catch missed data
+                                if is_new_file:
+                                    yesterday = most_recent_date - timedelta(days=1)
+                                    
+                                    # Check if we have a file from the previous day to include
+                                    for file in newest_files[1:]:
+                                        file_date = get_file_date(file)
+                                        # If this file is from yesterday, include it
+                                        if file_date.date() == yesterday.date():
+                                            logger.debug(f"CSV Processing: Including previous day's file for transition data: {os.path.basename(file)}")
+                                            files_to_keep.append(file)
+                                            break
+                                
+                                # Track this file as processed
+                                self.processed_files_history[server_id].add(most_recent_filename)
+                                
+                                logger.debug(f"CSV Processing: OPTIMIZATION - In regular mode, processing only {len(files_to_keep)} files: {[os.path.basename(f) for f in files_to_keep]}")
+                                files_to_process = files_to_keep
+                            else:
+                                logger.warning("CSV Processing: No newest files found - using empty list")
+                                files_to_process = []
                             only_new_lines = True  # Only process new lines in regular mode
                             
                             # FIXED: Better handling of line position tracking
@@ -1983,7 +2077,7 @@ class CSVProcessorCog(commands.Cog):
 
                                 if content:
                                     content_length = len(content) if hasattr(content, '__len__') else 0
-                                    logger.info(f"Downloaded content type: {type(content)}, length: {content_length}")
+                                    logger.debug(f"Downloaded content type: {type(content)}, length: {content_length}")
 
                                     # Verify the content is not empty
                                     if content_length == 0:
@@ -2013,7 +2107,7 @@ class CSVProcessorCog(commands.Cog):
 
                                     # Log a sample of the content for debugging
                                     sample = decoded_content[:200] + "..." if len(decoded_content) > 200 else decoded_content
-                                    logger.info(f"CSV content sample: {sample}")
+                                    logger.debug(f"CSV content sample: {sample}")
 
                                     # Process content - determine if we should only process new lines
                                     events = []
@@ -2047,7 +2141,7 @@ class CSVProcessorCog(commands.Cog):
                                             logger.debug("Found multiple sequential semicolons, confirming semicolon delimiter")
                                             detected_delimiter = ';'
 
-                                    logger.info(f"Using detected delimiter: '{detected_delimiter}' for file {file_path}")
+                                    logger.debug(f"Using detected delimiter: \'{detected_delimiter}\' for file {file_path}")
 
                                     # Check for data rows that match expected format - minimum field count for kill events
                                     has_valid_data = False
@@ -2241,7 +2335,7 @@ class CSVProcessorCog(commands.Cog):
 
                                         # Validate parsed events
                                         if events is not None:
-                                            logger.info(f"Parsed {len(events)} events from file {file_path}")
+                                            logger.debug(f"Parsed {len(events)} events from file {file_path}")
                                         else:
                                             logger.warning(f"No events parsed from file {file_path} despite valid format")
                                     except Exception as parse_error:
@@ -2258,7 +2352,7 @@ class CSVProcessorCog(commands.Cog):
                                     # Process in batches of 100 for better performance
                                     BATCH_SIZE = 100
                                     if len(events) > BATCH_SIZE:
-                                        logger.info(f"Using batch processing for {len(events)} events")
+                                        logger.debug(f"Using batch processing for {len(events)} events")
                                         event_batches = [events[i:i+BATCH_SIZE] for i in range(0, len(events), BATCH_SIZE)]
                                         logger.info(f"Processing {len(events)} events in {len(event_batches)} batches of max {BATCH_SIZE}")
 
@@ -2388,7 +2482,7 @@ class CSVProcessorCog(commands.Cog):
                                         suicide_events = []
                                         processed_count = 0
 
-                                        logger.info(f"Using batch processing for {len(events)} events")
+                                        logger.debug(f"Using batch processing for {len(events)} events")
 
                                         # Step 1: Normalize and categorize all events
                                         for event in events:
@@ -2428,7 +2522,7 @@ class CSVProcessorCog(commands.Cog):
                                                 logger.error(f"Error normalizing/categorizing event: {str(e)[:100]}")
 
                                         # Report categorization results
-                                        logger.info(f"Categorized events: {len(kill_events)} kills, {len(suicide_events)} suicides")
+                                        logger.debug(f"Categorized events: {len(kill_events)} kills, {len(suicide_events)} suicides")
 
                                         # Step 2: Process suicide events in batch
                                         if suicide_events:
@@ -2520,7 +2614,7 @@ class CSVProcessorCog(commands.Cog):
                                                 unique_players[player_id]["suicides"] += 1
 
                                             # Update stats for each unique player
-                                            logger.info(f"Updating stats for {len(unique_players)} unique players")
+                                            logger.debug(f"Updating stats for {len(unique_players)} unique players")
                                             for player_id, stats in unique_players.items():
                                                 # Get or create player
                                                 player = await self._get_or_create_player(server_id, player_id, stats["name"])
@@ -2533,7 +2627,7 @@ class CSVProcessorCog(commands.Cog):
                                                                             suicides=stats["suicides"])
 
                                             # Update nemesis/prey relationships in bulk
-                                            logger.info(f"Updating nemesis/prey relationships")
+                                            logger.debug(f"Updating nemesis/prey relationships")
                                             await Player.update_all_nemesis_and_prey(self.bot.db, server_id)
 
                                         except Exception as e:
@@ -2605,7 +2699,7 @@ class CSVProcessorCog(commands.Cog):
 
                             # Run garbage collection
                             collected = gc.collect()
-                            logger.info(f"Memory optimization: freed {collected} objects after CSV processing")
+                            logger.debug(f"Memory optimization: freed {collected} objects after CSV processing")
                         except Exception as mem_err:
                             logger.warning(f"Memory optimization failed: {mem_err}")
                         
@@ -2618,15 +2712,17 @@ class CSVProcessorCog(commands.Cog):
                                 logger.error(f"Error removing server from historical tracking: {e}")
 
                         # Keep the connection open for the next operation
-                        return files_processed, events_processed
-
+                
+                # Return results
+                return files_processed, events_processed
+                
             except Exception as e:
                 logger.error(f"SFTP error for server {server_id}: {str(e)}")
                 # Run garbage collection before returning
                 try:
                     import gc
                     collected = gc.collect()
-                    logger.info(f"Memory optimization: freed {collected} objects after CSV error")
+                    logger.debug(f"Memory optimization: freed {collected} objects after CSV error")
                 except:
                     pass
                 # CRITICAL FIX: Also clean up historical parse tracking in error path
@@ -2637,8 +2733,11 @@ class CSVProcessorCog(commands.Cog):
                     except Exception as e:
                         logger.error(f"Error removing server from historical tracking in error path: {e}")
                 
+                # Set empty results
                 files_processed = 0
                 events_processed = 0
+                
+                # Return error results
                 return files_processed, events_processed
 
         # Finalization code moved outside of the try-except block
@@ -2699,17 +2798,17 @@ class CSVProcessorCog(commands.Cog):
         logger.info(f"Historical parse will check files from {start_date.strftime('%Y-%m-%d')} until now")
 
         # CRITICAL FIX: Reset the last_processed timestamp and clear stats
-        logger.warning(f"CRITICAL FIX: Resetting last_processed timestamp for server {server_id}")
+        logger.info(f"Resetting last_processed timestamp for server {server_id}")
         self.last_processed[server_id] = start_date
-        logger.warning(f"CRITICAL FIX: Set processing window to include all files newer than {start_date.strftime('%Y.%m.%d-%H.%M.%S')}")
+        logger.debug(f"CRITICAL FIX: Set processing window to include all files newer than {start_date.strftime('%Y.%m.%d-%H.%M.%S')}")
         
         # Clear all existing player stats and kill data for a clean historical parse
         try:
-            logger.warning(f"CRITICAL FIX: Clearing existing stats for server {server_id}")
+            logger.info(f"Clearing existing stats for server {server_id}")
             
             # Clear kill events to rebuild from scratch
             kill_result = await self.bot.db.kills.delete_many({"server_id": server_id})
-            logger.warning(f"CRITICAL FIX: Deleted {kill_result.deleted_count} existing kill events for server {server_id}")
+            logger.info(f"Deleted {kill_result.deleted_count} existing kill events for server {server_id}")
             
             # Reset player stats
             player_result = await self.bot.db.players.update_many(
@@ -2748,7 +2847,10 @@ class CSVProcessorCog(commands.Cog):
                 )
                 logger.info(f"Direct config historical parse complete for server {server_id}: "
                           f"processed {files_processed} files with {events_processed} events")
-                return files_processed, events_processed
+                # Track server activity for adaptive processing
+            recommended_interval = await self._check_server_activity(server_id, events_processed)
+            
+            return files_processed, events_processed
             except Exception as e:
                 logger.error(f"Error in direct config historical parse for server {server_id}: {e}")
                 return 0, 0
@@ -2872,7 +2974,10 @@ class CSVProcessorCog(commands.Cog):
                         )
                         logger.info(f"Direct resolution historical parse complete for server {resolved_server_id}: "
                                    f"processed {files_processed} files with {events_processed} events")
-                        return files_processed, events_processed
+                        # Track server activity for adaptive processing
+            recommended_interval = await self._check_server_activity(server_id, events_processed)
+            
+            return files_processed, events_processed
                     except Exception as e:
                         logger.error(f"Error in direct resolution historical parse for server {resolved_server_id}: {e}")
                         return 0, 0
@@ -3001,7 +3106,10 @@ class CSVProcessorCog(commands.Cog):
                 )
                 logger.info(f"Traditional historical parse complete for server {server_id}: "
                            f"processed {files_processed} files with {events_processed} events")
-                return files_processed, events_processed
+                # Track server activity for adaptive processing
+            recommended_interval = await self._check_server_activity(server_id, events_processed)
+            
+            return files_processed, events_processed
             except Exception as e:
                 logger.error(f"Error in traditional historical parse for server {server_id}: {e}")
                 return 0, 0

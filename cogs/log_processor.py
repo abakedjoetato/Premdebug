@@ -135,17 +135,17 @@ class LogProcessorCog(commands.Cog):
 
         try:
             # Log detailed DB information for debugging
-            logger.info(f"Bot DB instance type: {type(self.bot.db)}")
-            logger.info(f"Bot DB instance repr: {repr(self.bot.db)}")
+            logger.debug(f"Bot DB instance type: {type(self.bot.db)}")
+            logger.debug(f"Bot DB instance repr: {repr(self.bot.db)}")
 
             # Test DB access directly
             try:
                 ping_result = await self.bot.db.command("ping")
-                logger.info(f"Database ping result: {ping_result}")
+                logger.debug(f"Database ping result: {ping_result}")
 
                 # Check if we have access to collections
                 collections = await self.bot.db.list_collection_names()
-                logger.info(f"Available collections: {collections}")
+                logger.debug(f"Available collections: {collections}")
             except Exception as e:
                 logger.error(f"Error testing database access: {e}")
 
@@ -159,7 +159,7 @@ class LogProcessorCog(commands.Cog):
                 return
 
             # Only log server count, not details (reduce log spam)
-            logger.info(f"Processing logs for {len(server_configs)} servers")
+            logger.debug(f"Processing logs for {len(server_configs)} servers")
 
             # BATCH PROCESSING: Group servers for efficient processing
             # Process servers in groups of 4 to balance load
@@ -205,7 +205,7 @@ class LogProcessorCog(commands.Cog):
 
         finally:
             duration = time.time() - start_time
-            logger.info(f"Log processing completed in {duration:.2f} seconds")
+            logger.debug(f"Log processing completed in {duration:.2f} seconds")
             self.is_processing = False
 
     @process_logs_task.before_loop
@@ -244,7 +244,7 @@ class LogProcessorCog(commands.Cog):
 
         try:
             # Database debugging
-            logger.info(f"Database instance: {self.bot.db}")
+            logger.debug(f"Database instance: {self.bot.db}")
 
             # Get all servers from the database (check both collections)
             servers = []
@@ -255,14 +255,14 @@ class LogProcessorCog(commands.Cog):
                 servers_cursor = self.bot.db.servers
                 # Debug: Get all servers regardless of SFTP status
                 all_servers = await servers_cursor.find({}).to_list(length=100)
-                logger.info(f"Found {len(all_servers)} total servers in servers collection")
+                logger.debug(f"Found {len(all_servers)} total servers in servers collection")
                 for srv in all_servers:
-                    logger.info(f"Server in 'servers': ID={srv.get('_id')}, sftp_enabled={srv.get('sftp_enabled')}, name={srv.get('server_name')}")
+                    logger.debug(f"Server in \'servers\': ID={srv.get('_id')}, sftp_enabled={srv.get('sftp_enabled')}, name={srv.get('server_name')}")
 
                 # Now filter for SFTP enabled
                 cursor = servers_cursor.find({"sftp_enabled": True})
                 servers_from_main = await cursor.to_list(length=100)
-                logger.info(f"Found {len(servers_from_main)} SFTP-enabled servers in servers collection")
+                logger.debug(f"Found {len(servers_from_main)} SFTP-enabled servers in servers collection")
                 if servers_from_main is not None:
                     servers.extend(servers_from_main)
             except Exception as e:
@@ -275,9 +275,9 @@ class LogProcessorCog(commands.Cog):
                 game_servers_cursor = self.bot.db.game_servers
                 # Debug: Get all game servers regardless of SFTP status
                 all_game_servers = await game_servers_cursor.find({}).to_list(length=100)
-                logger.info(f"Found {len(all_game_servers)} total servers in game_servers collection")
+                logger.debug(f"Found {len(all_game_servers)} total servers in game_servers collection")
                 for srv in all_game_servers:
-                    logger.info(f"Server in 'game_servers': ID={srv.get('_id')}, sftp_enabled={srv.get('sftp_enabled')}, name={srv.get('name')}")
+                    logger.debug(f"Server in \'game_servers\': ID={srv.get('_id')}, sftp_enabled={srv.get('sftp_enabled')}, name={srv.get('name')}")
 
                 # Track existing server IDs to avoid duplicates
                 existing_server_ids = set(srv.get('_id') for srv in servers if srv.get('_id'))
@@ -285,12 +285,12 @@ class LogProcessorCog(commands.Cog):
                 # Now filter for SFTP enabled
                 cursor = game_servers_cursor.find({"sftp_enabled": True})
                 servers_from_game = await cursor.to_list(length=100)
-                logger.info(f"Found {len(servers_from_game)} SFTP-enabled servers in game_servers collection")
+                logger.debug(f"Found {len(servers_from_game)} SFTP-enabled servers in game_servers collection")
 
                 # Add only servers that don't already exist in our list
                 unique_servers = [srv for srv in servers_from_game if srv.get('_id') not in existing_server_ids]
                 if unique_servers is not None:
-                    logger.info(f"Adding {len(unique_servers)} unique servers from game_servers collection")
+                    logger.debug(f"Adding {len(unique_servers)} unique servers from game_servers collection")
                     servers.extend(unique_servers)
                 else:
                     logger.info("No new unique servers found in game_servers collection")
@@ -301,7 +301,7 @@ class LogProcessorCog(commands.Cog):
                 logger.warning("No servers with SFTP enabled found in either collection")
                 return {}
 
-            logger.info(f"Processing {len(servers)} total servers with SFTP enabled")
+            logger.debug(f"Processing {len(servers)} total servers with SFTP enabled")
 
             for server in servers:
                 # Extract server ID and SFTP connection details
@@ -380,7 +380,7 @@ class LogProcessorCog(commands.Cog):
             return existing_parser
 
         # Otherwise create a new parser with the provided IDs
-        logger.info(f"Creating new LogParser with server_id={server_id}, original_server_id={original_server_id}")
+        logger.debug(f"Creating new LogParser with server_id={server_id}, original_server_id={original_server_id}")
         self.log_parsers[server_id] = LogParser(hostname=hostname, server_id=server_id, original_server_id=original_server_id)
         return self.log_parsers[server_id]
 
@@ -407,7 +407,7 @@ class LogProcessorCog(commands.Cog):
         try:
             # Create a new SFTP client for this server if not already existing
             if server_id is not None and server_id not in self.sftp_managers:
-                logger.info(f"Creating new SFTPManager for server {server_id}")
+                logger.debug(f"Creating new SFTPManager for server {server_id}")
 
                 # Import server_identity module for consistent ID resolution
                 from utils.server_identity import identify_server, KNOWN_SERVERS
@@ -415,7 +415,7 @@ class LogProcessorCog(commands.Cog):
                 # First check if this server is in KNOWN_SERVERS for highest priority
                 if server_id in KNOWN_SERVERS:
                     original_server_id = KNOWN_SERVERS[server_id]
-                    logger.info(f"Using known numeric ID '{original_server_id}' from KNOWN_SERVERS mapping")
+                    logger.debug(f"Using known numeric ID \'{original_server_id}\' from KNOWN_SERVERS mapping")
 
                     # Update config with correct numeric ID
                     config["original_server_id"] = original_server_id
@@ -503,11 +503,11 @@ class LogProcessorCog(commands.Cog):
                     guild_id=guild_id
                 )
 
-                logger.info(f"Resolved path components: server_dir={server_dir}, path_server_id={path_server_id}")
+                logger.debug(f"Resolved path components: server_dir={server_dir}, path_server_id={path_server_id}")
 
                 # Special case handling for the known problematic server UUID
                 if server_id == "5251382d-8bce-4abd-8bcb-cdef73698a46" and path_server_id != "7020":
-                    logger.info(f"Overriding path_server_id for known problematic server: {path_server_id} -> 7020")
+                    logger.debug(f"Overriding path_server_id for known problematic server: {path_server_id} -> 7020")
                     path_server_id = "7020"
                     # Rebuild server_dir with correct ID
                     clean_hostname = hostname.split(':')[0] if hostname else "server"
@@ -516,7 +516,7 @@ class LogProcessorCog(commands.Cog):
                 # Update config with the correct numeric ID for future use
                 if hasattr(config, 'get') and path_server_id != original_id:
                     config["original_server_id"] = path_server_id
-                    logger.info(f"Updated config with resolved path_server_id: {path_server_id}")
+                    logger.debug(f"Updated config with resolved path_server_id: {path_server_id}")
 
                     # Method 2: Try getting the SFTPManager for this server to see if it has original_server_id
                     if not path_server_id and server_id in self.sftp_managers:
@@ -580,12 +580,12 @@ class LogProcessorCog(commands.Cog):
                         logger.warning(f"Could not find numeric server ID, using UUID as fallback: {server_id}")
                         path_server_id = server_id
 
-                logger.info(f"Final path_server_id: {path_server_id}")
+                logger.debug(f"Final path_server_id: {path_server_id}")
 
                 # Build server directory using hostname_serverid format
                 hostname = config.get('hostname', 'server').split(':')[0]
                 server_dir = f"{hostname}_{path_server_id}"
-                logger.info(f"Building server directory with resolved server ID: {path_server_id}")
+                logger.debug(f"Building server directory with resolved server ID: {path_server_id}")
 
                 # Extract ID from hostname if available and path_server_id not set already
                 if not path_server_id and '_' in hostname:
@@ -611,9 +611,9 @@ class LogProcessorCog(commands.Cog):
                     # /hostname_serverid/Logs/Deadside.log where serverid is the numeric ID
                     server_dir = f"{hostname.split(':')[0]}_{path_server_id}"
                     logs_path = os.path.join("/", server_dir, "Logs")
-                    logger.info(f"Using default directory structure with ID {path_server_id}: {logs_path}")
+                    logger.debug(f"Using default directory structure with ID {path_server_id}: {logs_path}")
 
-                logger.info(f"Looking for log files in path: {logs_path}")
+                logger.debug(f"Looking for log files in path: {logs_path}")
 
                 # Keep track of the original connection state to ensure we're maintaining connections
                 was_connected = sftp.client is not None
@@ -645,7 +645,7 @@ class LogProcessorCog(commands.Cog):
                 path = logs_path  # Default path to start with
 
                 if log_file_path:
-                    logger.info(f"Found log file at: {log_file_path}")
+                    logger.debug(f"Found log file at: {log_file_path}")
                     log_files = [os.path.basename(log_file_path)]
                     path = os.path.dirname(log_file_path)
                 else:
@@ -722,7 +722,7 @@ class LogProcessorCog(commands.Cog):
                     try:
                         # Get file modification time (use os.path.join for proper path handling)
                         file_path = os.path.join(path, log_file)
-                        logger.info(f"Getting stats for log file: {file_path}")
+                        logger.debug(f"Getting stats for log file: {file_path}")
                         file_stat = await sftp.get_file_stats(file_path)
 
                         if not file_stat:

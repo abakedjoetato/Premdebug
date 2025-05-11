@@ -404,7 +404,7 @@ class CSVParser:
             logger.warning(f"No valid delimiters found in file: {file_path or 'unknown'} - content might not be CSV")
             # We'll still try to parse with default separator, but log the warning
             
-        logger.info(f"Detected delimiter: '{best_delimiter}' (counts: {delimiters})")
+        logger.debug(f"Detected delimiter: \'{best_delimiter}\' (counts: {delimiters})")
         
         # Store the detected delimiter for testing and diagnostics
         self.last_detected_delimiter = best_delimiter

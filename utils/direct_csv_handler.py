@@ -59,7 +59,7 @@ def direct_parse_csv_content(content_str: str, file_path: str = "", server_id: s
             delimiter = ','
             logger.warning(f"Unusual delimiter detected: using comma instead of semicolon")
         
-        logger.info(f"Using delimiter '{delimiter}' for content parsing (semicolons: {semicolons}, commas: {commas})")
+        logger.debug(f"Using delimiter \'{delimiter}\' for content parsing (semicolons: {semicolons}, commas: {commas})")
         
         # Create CSV reader
         csv_reader = csv.reader(io.StringIO(content_str), delimiter=delimiter)
@@ -142,7 +142,7 @@ def direct_parse_csv_content(content_str: str, file_path: str = "", server_id: s
             # Add to events list
             events.append(event)
             
-        logger.info(f"Directly parsed {len(events)} events from {row_count} rows in CSV content")
+        logger.debug(f"Directly parsed {len(events)} events from {row_count} rows in CSV content")
         return events, row_count
         
     except Exception as e:

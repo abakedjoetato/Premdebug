@@ -2,12 +2,16 @@ import os
 import sys
 import asyncio
 import logging
+from utils.logging_setup import setup_logging
 import discord
 from discord.ext import commands
 import motor.motor_asyncio
 from typing import Optional, List, Dict, Any, Union, cast
 import traceback
 from datetime import datetime
+
+# Set up custom logging configuration
+setup_logging()
 
 # Configure logger
 logger = logging.getLogger("bot")
