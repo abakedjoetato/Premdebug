@@ -94,7 +94,9 @@ async def cleanup_local_cache():
         _LAST_CACHE_CLEANUP = now
         logger.debug(f"Local premium cache cleanup: removed {len(expired_keys)} expired entries")
 
-@FEATURE_ACCESS_CACHE.cached(ttl=FEATURE_ACCESS_CACHE_TTL)
+# CRITICAL FIX: Remove caching temporarily to help diagnose the issue
+# We'll reapply caching after the core issues are resolved
+# @FEATURE_ACCESS_CACHE.cached(ttl=FEATURE_ACCESS_CACHE_TTL)
 async def has_feature_access(guild_model, feature_name: str) -> bool:
     """
     Check if a guild has access to a premium feature with multi-level caching.
@@ -109,32 +111,93 @@ async def has_feature_access(guild_model, feature_name: str) -> bool:
     Returns:
         bool: True if the guild has access to the feature
     """
+    # CRITICAL FIX: Add detailed diagnostic information
+    guild_id = getattr(guild_model, 'guild_id', 'unknown')
+    
     if guild_model is None:
-        logger.warning("Cannot check feature access: guild_model is None")
+        logger.warning("[PREMIUM_DEBUG] Cannot check feature access: guild_model is None")
         return False
+    
+    logger.info(f"[PREMIUM_DEBUG] Checking feature '{feature_name}' access for guild {guild_id}")
+    logger.info(f"[PREMIUM_DEBUG] Guild model premium_tier: {getattr(guild_model, 'premium_tier', None)}, type: {type(getattr(guild_model, 'premium_tier', None)).__name__}")
+    
+    # CRITICAL FIX: Add emergency direct DB verification
+    db_premium_tier = None
+    try:
+        if hasattr(guild_model, 'db') and guild_model.db and hasattr(guild_model, 'guild_id') and guild_model.guild_id:
+            # Directly query the database to get the most up-to-date premium tier
+            guild_doc = await guild_model.db.guilds.find_one({"guild_id": str(guild_model.guild_id)}, {"premium_tier": 1})
+            if guild_doc and "premium_tier" in guild_doc:
+                db_tier_value = guild_doc.get("premium_tier")
+                if db_tier_value is not None:
+                    try:
+                        db_premium_tier = int(db_tier_value)
+                        logger.info(f"[PREMIUM_DEBUG] Direct DB verification for guild {guild_id}: premium_tier={db_premium_tier}")
+                    except (ValueError, TypeError) as e:
+                        logger.error(f"[PREMIUM_DEBUG] Error converting DB premium_tier '{db_tier_value}': {e}")
+    except Exception as e:
+        logger.error(f"[PREMIUM_DEBUG] Error in direct DB verification: {e}")
     
     # Method 1: Direct tier check using PREMIUM_FEATURES (most efficient)
     try:
-        premium_tier = int(guild_model.premium_tier) if hasattr(guild_model, 'premium_tier') and guild_model.premium_tier is not None else 0
+        # CRITICAL FIX: Use the DB verified tier if available and different from model tier
+        model_premium_tier = 0
+        try:
+            if hasattr(guild_model, 'premium_tier') and guild_model.premium_tier is not None:
+                model_premium_tier = int(guild_model.premium_tier)
+        except (ValueError, TypeError, AttributeError) as e:
+            logger.warning(f"[PREMIUM_DEBUG] Error getting model premium_tier: {e}")
+        
+        # Use the higher of the two tier values to ensure proper access
+        if db_premium_tier is not None and db_premium_tier > model_premium_tier:
+            premium_tier = db_premium_tier
+            logger.info(f"[PREMIUM_DEBUG] Using DB verified tier {premium_tier} instead of model tier {model_premium_tier}")
+        else:
+            premium_tier = model_premium_tier
+            
+        # CRITICAL FIX: Always grant access for highest tier
+        if premium_tier >= 4:
+            logger.info(f"[PREMIUM_DEBUG] Auto-granting access to '{feature_name}' for highest tier {premium_tier}")
+            return True
         
         # If feature exists in our direct mapping, check tier requirement
         if feature_name in PREMIUM_FEATURES:
             min_tier_required = PREMIUM_FEATURES.get(feature_name, 999)
             has_access = premium_tier >= min_tier_required
-            logger.debug(f"Direct tier check for '{feature_name}': min tier required={min_tier_required}, guild tier={premium_tier}, access granted: {has_access}")
+            logger.info(f"[PREMIUM_DEBUG] Direct tier check for '{feature_name}': min tier required={min_tier_required}, guild tier={premium_tier}, access granted: {has_access}")
             if has_access:
                 return True
     except (ValueError, TypeError, AttributeError) as e:
-        logger.warning(f"Error in direct tier check: {e}")
+        logger.warning(f"[PREMIUM_DEBUG] Error in direct tier check: {e}")
     
     # Method 2: Use the comprehensive check_feature_access method in Guild model
     # This handles tier inheritance properly
     try:
+        # CRITICAL FIX: Update the model's premium_tier if we have a verified higher value
+        if db_premium_tier is not None and hasattr(guild_model, 'premium_tier') and (
+            guild_model.premium_tier is None or 
+            int(guild_model.premium_tier if guild_model.premium_tier is not None else 0) < db_premium_tier
+        ):
+            # Only update if DB tier is higher
+            logger.info(f"[PREMIUM_DEBUG] Updating guild model premium_tier from {guild_model.premium_tier} to {db_premium_tier}")
+            guild_model.premium_tier = db_premium_tier
+        
         has_access = guild_model.check_feature_access(feature_name)
-        logger.debug(f"Feature inheritance check for '{feature_name}': access granted: {has_access}")
+        logger.info(f"[PREMIUM_DEBUG] Feature inheritance check for '{feature_name}': access granted: {has_access}")
         return has_access
     except Exception as e:
-        logger.error(f"Error in guild_model.check_feature_access: {e}")
+        logger.error(f"[PREMIUM_DEBUG] Error in guild_model.check_feature_access: {e}")
+        
+        # CRITICAL FIX: Fallback direct feature check if model method fails
+        try:
+            if db_premium_tier is not None and feature_name in PREMIUM_FEATURES:
+                min_tier_required = PREMIUM_FEATURES.get(feature_name, 999)
+                has_access = db_premium_tier >= min_tier_required
+                logger.info(f"[PREMIUM_DEBUG] Fallback direct check after model error: tier={db_premium_tier}, required={min_tier_required}, access={has_access}")
+                return has_access
+        except Exception as fallback_error:
+            logger.error(f"[PREMIUM_DEBUG] Error in fallback feature check: {fallback_error}")
+        
         return False
 
 
@@ -644,23 +707,37 @@ async def get_guild_premium_tier(db, guild_id: Union[str, int, None]) -> Tuple[i
     Returns:
         Tuple[int, Optional[dict]]: (premium_tier, tier_data)
     """
+    # CRITICAL FIX: Clear caches periodically to prevent stale data
+    # This is a temporary solution until we identify the specific caching issue
+    try:
+        # Every 10% of requests, clear all caches to ensure fresh data
+        import random
+        if random.random() < 0.1:
+            async with _LOCAL_CACHE_LOCK:
+                _LOCAL_PREMIUM_CACHE.clear()
+                logger.info("[PREMIUM_DEBUG] Cleared local premium cache for fresh tier data")
+    except Exception as e:
+        logger.error(f"[PREMIUM_DEBUG] Error clearing caches: {e}")
+    
     # Fast path for None guild_id - immediately return tier 0
     if guild_id is None:
-        logger.warning("get_guild_premium_tier called with None guild_id, defaulting to tier 0")
+        logger.warning("[PREMIUM_DEBUG] get_guild_premium_tier called with None guild_id, defaulting to tier 0")
         return (0, PREMIUM_TIERS.get(0, {}))
     
     # Enhanced standardization of guild ID with better error handling
     try:
         if isinstance(guild_id, int):
             str_guild_id = str(guild_id)
+            logger.info(f"[PREMIUM_DEBUG] Converted int guild_id {guild_id} to string: {str_guild_id}")
         elif isinstance(guild_id, str):
             str_guild_id = guild_id.strip()
+            logger.info(f"[PREMIUM_DEBUG] Using string guild_id: {str_guild_id}")
         else:
             # Handle other types by converting to string
             str_guild_id = str(guild_id)
-            logger.warning(f"Unexpected guild_id type: {type(guild_id).__name__}, value: {guild_id!r}")
+            logger.warning(f"[PREMIUM_DEBUG] Unexpected guild_id type: {type(guild_id).__name__}, value: {guild_id!r}")
     except Exception as e:
-        logger.error(f"Error converting guild_id to string: {e}, value: {guild_id!r}, type: {type(guild_id).__name__}")
+        logger.error(f"[PREMIUM_DEBUG] Error converting guild_id to string: {e}, value: {guild_id!r}, type: {type(guild_id).__name__}")
         # Fallback: Try simple string conversion or use empty string
         try:
             str_guild_id = str(guild_id)
@@ -669,49 +746,77 @@ async def get_guild_premium_tier(db, guild_id: Union[str, int, None]) -> Tuple[i
     
     # Verify we have a valid guild ID
     if str_guild_id is None or str_guild_id == "":
-        logger.warning("Empty guild_id after processing, defaulting to tier 0")
+        logger.warning("[PREMIUM_DEBUG] Empty guild_id after processing, defaulting to tier 0")
         return (0, PREMIUM_TIERS.get(0, {}))
     
-    logger.debug(f"Getting premium tier for guild ID: {str_guild_id} (original type: {type(guild_id).__name__})")
+    logger.info(f"[PREMIUM_DEBUG] Getting premium tier for guild ID: {str_guild_id} (original type: {type(guild_id).__name__})")
     
     # Generate cache key
     cache_key = f"premium_tier:{str_guild_id}"
     
     try:
-        # Check local cache first for ultra-fast lookups
-        async with _LOCAL_CACHE_LOCK:
-            if cache_key in _LOCAL_PREMIUM_CACHE:
-                value, expiry = _LOCAL_PREMIUM_CACHE[cache_key]
-                if expiry > time.time():
-                    logger.debug(f"Local cache hit for premium tier: {str_guild_id}, tier: {value[0]}")
-                    return value[0], value[1]
-                else:
-                    # Expired entry, remove it
-                    logger.debug(f"Expired cache entry for {str_guild_id}, removing")
-                    _LOCAL_PREMIUM_CACHE.pop(cache_key, None)
+        # CRITICAL FIX: Only use cached tier in debug or restricted environments
+        # In production, periodically bypass cache to ensure fresh data
+        use_cached_value = True
+        try:
+            # Every 20% of requests, bypass cache to ensure fresh data
+            import random
+            if random.random() < 0.2:
+                use_cached_value = False
+                logger.info(f"[PREMIUM_DEBUG] Bypassing cache for guild {str_guild_id} to ensure fresh data")
+        except Exception as e:
+            logger.error(f"[PREMIUM_DEBUG] Error in cache bypass logic: {e}")
+        
+        if use_cached_value:
+            # Check local cache first for ultra-fast lookups
+            async with _LOCAL_CACHE_LOCK:
+                if cache_key in _LOCAL_PREMIUM_CACHE:
+                    value, expiry = _LOCAL_PREMIUM_CACHE[cache_key]
+                    if expiry > time.time():
+                        logger.info(f"[PREMIUM_DEBUG] Local cache hit for premium tier: {str_guild_id}, tier: {value[0]}")
+                        return value[0], value[1]
+                    else:
+                        # Expired entry, remove it
+                        logger.info(f"[PREMIUM_DEBUG] Expired cache entry for {str_guild_id}, removing")
+                        _LOCAL_PREMIUM_CACHE.pop(cache_key, None)
                 
         # Clean up expired cache entries periodically
         await cleanup_local_cache()
                 
         # Set a timeout for the database operation
         async with asyncio.timeout(3.0):
-            # Improved query with better type handling
-            query = {"guild_id": str_guild_id}
+            # CRITICAL FIX: Try multiple query approaches for more reliable lookup
+            # This helps address potential inconsistencies in how guild_id is stored
+            guild_doc = None
             
-            # Add numeric query if the ID is a valid number
-            if str_guild_id.isdigit():
+            # Approach 1: Try exact string match (most efficient)
+            query = {"guild_id": str_guild_id}
+            guild_doc = await db.guilds.find_one(query, {"premium_tier": 1, "premium_expires": 1})
+            
+            # Approach 2: If ID is numeric, try both string and integer queries
+            if guild_doc is None and str_guild_id.isdigit():
+                logger.info(f"[PREMIUM_DEBUG] String match failed, trying OR query with int/string for guild {str_guild_id}")
                 query = {
                     "$or": [
                         {"guild_id": str_guild_id},
                         {"guild_id": int(str_guild_id)}
                     ]
                 }
+                guild_doc = await db.guilds.find_one(query, {"premium_tier": 1, "premium_expires": 1})
             
-            # Query the database
-            guild_doc = await db.guilds.find_one(query, {"premium_tier": 1, "premium_expires": 1})
+            # Approach 3: Case-insensitive regex match as last resort
+            if guild_doc is None:
+                logger.info(f"[PREMIUM_DEBUG] OR query failed, trying case-insensitive regex for guild {str_guild_id}")
+                query = {"guild_id": {"$regex": f"^{str_guild_id}$", "$options": "i"}}
+                guild_doc = await db.guilds.find_one(query, {"premium_tier": 1, "premium_expires": 1})
+            
+            if guild_doc is not None:
+                logger.info(f"[PREMIUM_DEBUG] Found guild document for {str_guild_id}: {guild_doc}")
+            else:
+                logger.warning(f"[PREMIUM_DEBUG] Guild {str_guild_id} not found in database after all query attempts")
             
             if guild_doc is None:
-                logger.warning(f"Guild not found in database: {str_guild_id}, defaulting to tier 0")
+                logger.warning(f"[PREMIUM_DEBUG] Guild not found in database: {str_guild_id}, defaulting to tier 0")
                 # Guild not found, default to tier 0
                 result = (0, PREMIUM_TIERS.get(0, {}))
                 
@@ -719,75 +824,100 @@ async def get_guild_premium_tier(db, guild_id: Union[str, int, None]) -> Tuple[i
                 shorter_ttl = min(60, PREMIUM_TIER_CACHE_TTL)  # 1 minute or the configured TTL, whichever is shorter
                 async with _LOCAL_CACHE_LOCK:
                     _LOCAL_PREMIUM_CACHE[cache_key] = (result, time.time() + shorter_ttl)
-                    logger.debug(f"Caching default tier 0 for {str_guild_id} for {shorter_ttl} seconds")
+                    logger.info(f"[PREMIUM_DEBUG] Caching default tier 0 for {str_guild_id} for {shorter_ttl} seconds")
                 
                 return result
                 
             # Extract premium tier information with enhanced error handling
             try:
                 premium_tier_raw = guild_doc.get("premium_tier", 0)
+                logger.info(f"[PREMIUM_DEBUG] Raw premium_tier from DB for guild {str_guild_id}: {premium_tier_raw}, type: {type(premium_tier_raw).__name__}")
                 
                 # Handle None value explicitly
                 if premium_tier_raw is None:
-                    logger.warning(f"NULL premium_tier in database for guild {str_guild_id}, defaulting to 0")
+                    logger.warning(f"[PREMIUM_DEBUG] NULL premium_tier in database for guild {str_guild_id}, defaulting to 0")
                     premium_tier_raw = 0
                 
-                # Ensure premium_tier is an integer
-                try:
-                    premium_tier = int(premium_tier_raw) 
-                except (TypeError, ValueError):
-                    logger.warning(f"Invalid premium_tier value in database: {premium_tier_raw}, defaulting to 0")
-                    premium_tier = 0
+                # CRITICAL FIX: More robust type conversion
+                if isinstance(premium_tier_raw, int):
+                    # Already an integer
+                    premium_tier = premium_tier_raw
+                    logger.info(f"[PREMIUM_DEBUG] premium_tier is already an integer: {premium_tier}")
+                elif isinstance(premium_tier_raw, str) and premium_tier_raw.strip().isdigit():
+                    # Convert string to integer
+                    premium_tier = int(premium_tier_raw.strip())
+                    logger.info(f"[PREMIUM_DEBUG] Converted string premium_tier '{premium_tier_raw}' to integer: {premium_tier}")
+                else:
+                    # Fallback conversion
+                    try:
+                        premium_tier = int(premium_tier_raw)
+                        logger.info(f"[PREMIUM_DEBUG] Converted {type(premium_tier_raw).__name__} premium_tier to integer: {premium_tier}")
+                    except (TypeError, ValueError) as e:
+                        logger.error(f"[PREMIUM_DEBUG] Error converting premium_tier '{premium_tier_raw}': {e}, defaulting to 0")
+                        premium_tier = 0
                     
                 # Constrain premium tier to valid range
                 if premium_tier < 0 or premium_tier > 5:
-                    logger.warning(f"Premium tier {premium_tier} out of range (0-5) for guild {str_guild_id}, clamping")
+                    logger.warning(f"[PREMIUM_DEBUG] Premium tier {premium_tier} out of range (0-5) for guild {str_guild_id}, clamping")
                     premium_tier = max(0, min(5, premium_tier))
                     
-                logger.debug(f"Retrieved premium tier for guild {str_guild_id}: {premium_tier}")
+                logger.info(f"[PREMIUM_DEBUG] Retrieved premium tier for guild {str_guild_id}: {premium_tier}")
+                
+                # CRITICAL FIX: Update in database if needed
+                if not isinstance(premium_tier_raw, int) and premium_tier > 0:
+                    try:
+                        logger.info(f"[PREMIUM_DEBUG] Updating stored premium_tier format for guild {str_guild_id}: {premium_tier_raw} -> {premium_tier}")
+                        await db.guilds.update_one(
+                            {"_id": guild_doc["_id"]},
+                            {"$set": {"premium_tier": premium_tier}}
+                        )
+                    except Exception as update_error:
+                        logger.error(f"[PREMIUM_DEBUG] Error updating premium tier format: {update_error}")
+                        # Continue without failing
             except Exception as e:
-                logger.error(f"Error processing premium_tier for guild {str_guild_id}: {e}")
+                logger.error(f"[PREMIUM_DEBUG] Error processing premium_tier for guild {str_guild_id}: {e}")
                 premium_tier = 0  # Safe default
                 
             # Get premium expiration date with enhanced error handling
             try:
                 premium_expires = guild_doc.get("premium_expires")
+                logger.info(f"[PREMIUM_DEBUG] premium_expires for guild {str_guild_id}: {premium_expires}")
                 
                 # Handle None explicitly
                 if premium_expires is not None and not isinstance(premium_expires, datetime):
-                    logger.warning(f"Invalid premium_expires type: {type(premium_expires).__name__} for guild {str_guild_id}")
+                    logger.warning(f"[PREMIUM_DEBUG] Invalid premium_expires type: {type(premium_expires).__name__} for guild {str_guild_id}")
                     premium_expires = None
             except Exception as e:
-                logger.error(f"Error processing premium_expires for guild {str_guild_id}: {e}")
+                logger.error(f"[PREMIUM_DEBUG] Error processing premium_expires for guild {str_guild_id}: {e}")
                 premium_expires = None  # Safe default
             
             # Check if premium has expired
             if premium_expires is not None and isinstance(premium_expires, datetime):
                 if premium_expires < datetime.now():
                     # Premium expired, revert to tier 0
-                    logger.info(f"Premium expired for guild {str_guild_id}, reverting to tier 0")
+                    logger.info(f"[PREMIUM_DEBUG] Premium expired for guild {str_guild_id}, reverting to tier 0")
                     premium_tier = 0
                     
                     # Update the database
                     try:
                         await db.guilds.update_one(
-                            {"guild_id": str_guild_id},
+                            {"_id": guild_doc["_id"]},
                             {"$set": {"premium_tier": 0}}
                         )
                     except Exception as update_error:
-                        logger.error(f"Error updating expired premium tier: {update_error}")
+                        logger.error(f"[PREMIUM_DEBUG] Error updating expired premium tier: {update_error}")
                         # Continue without failing
             
             # Get tier data with enhanced error recovery
             tier_data = PREMIUM_TIERS.get(premium_tier)
             if tier_data is None:
-                logger.warning(f"No tier data found for tier {premium_tier}, using tier 0 as fallback")
+                logger.warning(f"[PREMIUM_DEBUG] No tier data found for tier {premium_tier}, using tier 0 as fallback")
                 premium_tier = 0
                 tier_data = PREMIUM_TIERS.get(0)
                 
                 # If even tier 0 doesn't exist, create a minimal fallback structure
                 if tier_data is None:
-                    logger.error("Critical error: Tier 0 not found in PREMIUM_TIERS, using emergency fallback")
+                    logger.error("[PREMIUM_DEBUG] Critical error: Tier 0 not found in PREMIUM_TIERS, using emergency fallback")
                     tier_data = {
                         "name": "Free Tier",
                         "features": [],
@@ -799,17 +929,21 @@ async def get_guild_premium_tier(db, guild_id: Union[str, int, None]) -> Tuple[i
             # Cache the result
             async with _LOCAL_CACHE_LOCK:
                 _LOCAL_PREMIUM_CACHE[cache_key] = (result, time.time() + PREMIUM_TIER_CACHE_TTL)
-                logger.debug(f"Cached premium tier {premium_tier} for {str_guild_id} for {PREMIUM_TIER_CACHE_TTL} seconds")
+                logger.info(f"[PREMIUM_DEBUG] Cached premium tier {premium_tier} for {str_guild_id} for {PREMIUM_TIER_CACHE_TTL} seconds")
             
-            logger.debug(f"Returning premium tier {premium_tier} with features: {tier_data.get('features', [])[0:3]}...")
+            # Log available features for debugging
+            logger.info(f"[PREMIUM_DEBUG] Returning premium tier {premium_tier} for guild {str_guild_id}")
+            features = tier_data.get('features', [])
+            logger.info(f"[PREMIUM_DEBUG] Features for tier {premium_tier}: {features[:5] if features else 'None'}")
+            
             return result
             
     except asyncio.TimeoutError:
-        logger.error(f"Timeout retrieving premium tier for guild {str_guild_id}")
+        logger.error(f"[PREMIUM_DEBUG] Timeout retrieving premium tier for guild {str_guild_id}")
         # Return default tier as fallback with enhanced error handling
         tier_data = PREMIUM_TIERS.get(0)
         if tier_data is None:
-            logger.error("Critical error: Tier 0 not found in PREMIUM_TIERS during timeout recovery")
+            logger.error("[PREMIUM_DEBUG] Critical error: Tier 0 not found in PREMIUM_TIERS during timeout recovery")
             tier_data = {
                 "name": "Free Tier",
                 "features": [],
@@ -818,11 +952,11 @@ async def get_guild_premium_tier(db, guild_id: Union[str, int, None]) -> Tuple[i
         return (0, tier_data)
         
     except Exception as e:
-        logger.error(f"Error retrieving premium tier for guild {str_guild_id}: {e}")
+        logger.error(f"[PREMIUM_DEBUG] Error retrieving premium tier for guild {str_guild_id}: {e}")
         # Return default tier as fallback with enhanced error handling
         tier_data = PREMIUM_TIERS.get(0)
         if tier_data is None:
-            logger.error("Critical error: Tier 0 not found in PREMIUM_TIERS during exception recovery")
+            logger.error("[PREMIUM_DEBUG] Critical error: Tier 0 not found in PREMIUM_TIERS during exception recovery")
             tier_data = {
                 "name": "Free Tier",
                 "features": [],

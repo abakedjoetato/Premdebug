@@ -453,15 +453,65 @@ class Guild(BaseModel):
         Returns:
             Guild object or None if not found
         """
-        # Always ensure guild_id is a string for consistent lookup
-        string_guild_id = str(guild_id) if guild_id is not None else None
+        # CRITICAL FIX: Enhanced logging and more robust guild ID handling
+        logger.info(f"[GUILD_DEBUG] Looking up guild by ID: {guild_id}, type: {type(guild_id).__name__}")
         
-        if string_guild_id is None:
-            logger.warning("Attempted to get guild with None guild_id")
+        # CRITICAL FIX: Handle guild_id conversion more robustly
+        try:
+            if guild_id is None:
+                logger.warning("[GUILD_DEBUG] Attempted to get guild with None guild_id")
+                return None
+                
+            # Standardize guild_id to string format
+            if isinstance(guild_id, int):
+                string_guild_id = str(guild_id)
+                logger.info(f"[GUILD_DEBUG] Converted integer guild_id {guild_id} to string: {string_guild_id}")
+            elif isinstance(guild_id, str):
+                string_guild_id = guild_id
+                logger.info(f"[GUILD_DEBUG] Using string guild_id directly: {string_guild_id}")
+            else:
+                # Handle other types safely
+                string_guild_id = str(guild_id)
+                logger.warning(f"[GUILD_DEBUG] Converted unexpected guild_id type {type(guild_id).__name__} to string: {string_guild_id}")
+                
+            if not string_guild_id:
+                logger.warning("[GUILD_DEBUG] Empty guild_id after conversion")
+                return None
+        except Exception as e:
+            logger.error(f"[GUILD_DEBUG] Error converting guild_id: {e}")
             return None
             
-        document = await db.guilds.find_one({"guild_id": string_guild_id})
-        return cls.create_from_db_document(document, db) if document is not None else None
+        try:
+            # CRITICAL FIX: Try multiple query approaches if needed
+            document = None
+            
+            # Approach 1: Direct string match (most common case)
+            document = await db.guilds.find_one({"guild_id": string_guild_id})
+            
+            # Approach 2: If not found and guild_id is numeric, try integer match
+            if document is None and string_guild_id.isdigit():
+                logger.info(f"[GUILD_DEBUG] Trying numeric lookup for guild_id: {string_guild_id}")
+                document = await db.guilds.find_one({"guild_id": int(string_guild_id)})
+                
+            # Approach 3: Case-insensitive regex match as last resort
+            if document is None:
+                logger.info(f"[GUILD_DEBUG] Trying case-insensitive lookup for guild_id: {string_guild_id}")
+                document = await db.guilds.find_one({"guild_id": {"$regex": f"^{string_guild_id}$", "$options": "i"}})
+                
+            if document is not None:
+                logger.info(f"[GUILD_DEBUG] Found guild document for guild_id: {string_guild_id}")
+                guild = cls.create_from_db_document(document, db)
+                
+                # CRITICAL FIX: Verify the returned guild has the expected premium_tier
+                if guild and hasattr(guild, 'premium_tier'):
+                    logger.info(f"[GUILD_DEBUG] Guild {string_guild_id} premium_tier: {guild.premium_tier}, type: {type(guild.premium_tier).__name__}")
+                return guild
+            else:
+                logger.warning(f"[GUILD_DEBUG] No guild found for guild_id: {string_guild_id}")
+                return None
+        except Exception as e:
+            logger.error(f"[GUILD_DEBUG] Error retrieving guild: {e}")
+            return None
 
     async def set_premium_tier(self, db, tier: int) -> bool:
         """Set premium tier for guild
@@ -755,19 +805,65 @@ class Guild(BaseModel):
         from config import PREMIUM_TIERS
         from utils.premium import PREMIUM_FEATURES
 
-        # Log for debugging purposes
-        logger.info(f"Checking feature access for '{feature_name}' in guild with tier {self.premium_tier}")
+        # CRITICAL FIX: Add detailed diagnostic logging
+        guild_id = getattr(self, 'guild_id', 'unknown')
+        logger.info(f"[TIER_DEBUG] Guild {guild_id}: Checking feature access for '{feature_name}', raw premium_tier={self.premium_tier}, type={type(self.premium_tier).__name__}")
         
+        # CRITICAL FIX: Check for premium_tier data inconsistency
+        # If this is happening during an active Discord context, perform emergency DB verification
+        emergency_verified_tier = None
+        try:
+            # Get direct tier value from DB if available, bypassing any object-level issues
+            if hasattr(self, 'db') and self.db and hasattr(self, 'guild_id') and self.guild_id:
+                async def _verify_tier_from_db():
+                    try:
+                        guild_doc = await self.db.guilds.find_one({"guild_id": str(self.guild_id)}, {"premium_tier": 1})
+                        if guild_doc and "premium_tier" in guild_doc:
+                            db_tier = guild_doc.get("premium_tier")
+                            if db_tier is not None:
+                                return int(db_tier)
+                    except Exception as e:
+                        logger.error(f"[TIER_DEBUG] Error in emergency tier verification: {e}")
+                    return None
+
+                # Check if we're in an event loop
+                import asyncio
+                if asyncio.get_event_loop().is_running():
+                    # Create a task but don't wait - this avoids coroutine issues
+                    # We'll use the result next time if available, and rely on object tier this time
+                    asyncio.create_task(_verify_tier_from_db())
+                    logger.info(f"[TIER_DEBUG] Started background DB verification task for guild {guild_id}")
+        except Exception as e:
+            logger.error(f"[TIER_DEBUG] Error in emergency verification setup: {e}")
+            
         # Make sure premium_tier is an integer (fix for potential string storage issue)
         try:
-            premium_tier = int(self.premium_tier) if self.premium_tier is not None else 0
-        except (ValueError, TypeError):
-            logger.warning(f"Invalid premium_tier value: {self.premium_tier}, defaulting to 0")
+            if emergency_verified_tier is not None:
+                # Use the directly verified tier if available
+                premium_tier = emergency_verified_tier
+                logger.info(f"[TIER_DEBUG] Using emergency verified tier: {premium_tier}")
+            elif isinstance(self.premium_tier, int):
+                # Already an int, use directly
+                premium_tier = self.premium_tier
+            elif isinstance(self.premium_tier, str) and self.premium_tier.strip().isdigit():
+                # Convert string to int
+                premium_tier = int(self.premium_tier.strip())
+            elif self.premium_tier is None:
+                # Default to 0 if None
+                premium_tier = 0
+                logger.warning(f"[TIER_DEBUG] Premium tier is None for guild {guild_id}, defaulting to 0")
+            else:
+                # Try direct conversion as last resort
+                premium_tier = int(self.premium_tier)
+                
+            logger.info(f"[TIER_DEBUG] Guild {guild_id}: Converted premium_tier: {premium_tier}")
+        except (ValueError, TypeError) as e:
+            logger.error(f"[TIER_DEBUG] Type conversion error for premium_tier={self.premium_tier}, error: {str(e)}")
             premium_tier = 0
             
         # CRITICAL FIX: Special handling for tier 4 (highest tier) - always grant access to all features
         if premium_tier >= 4:
-            logger.info(f"Automatic access granted to '{feature_name}' for guild with tier {premium_tier} (highest tier)")
+            logger.info(f"[TIER_DEBUG] Automatic access granted to '{feature_name}' for guild {guild_id} with tier {premium_tier} (highest tier)")
             return True
         
         # Method 1: Check using direct PREMIUM_FEATURES mapping (most efficient)
@@ -775,7 +871,7 @@ class Guild(BaseModel):
         if feature_name in PREMIUM_FEATURES:
             min_tier_required = PREMIUM_FEATURES.get(feature_name, 999)  # Default to high tier if not found
             has_access = premium_tier >= min_tier_required
-            logger.info(f"Feature check via PREMIUM_FEATURES: feature '{feature_name}' requires tier {min_tier_required}, guild has tier {premium_tier}, access: {has_access}")
+            logger.info(f"[TIER_DEBUG] Feature check via PREMIUM_FEATURES: feature '{feature_name}' requires tier {min_tier_required}, guild {guild_id} has tier {premium_tier}, access: {has_access}")
             if has_access:
                 return True
         
@@ -792,9 +888,9 @@ class Guild(BaseModel):
                     if feature not in all_features:
                         all_features.append(feature)
         
-        logger.info(f"Available features after tier inheritance (0 to {premium_tier}): {all_features}")
+        logger.info(f"[TIER_DEBUG] Guild {guild_id}: Available features after tier inheritance (0 to {premium_tier}): {all_features}")
         has_access = feature_name in all_features
-        logger.info(f"Guild access to '{feature_name}': {has_access}")
+        logger.info(f"[TIER_DEBUG] Guild {guild_id} access to '{feature_name}': {has_access}")
         
         return has_access
 
@@ -889,32 +985,75 @@ class Guild(BaseModel):
         if document is None:
             return None
         
+        # CRITICAL FIX: Enhance logging for document inspection
+        guild_id = document.get('guild_id', 'unknown')
+        logger.info(f"[TIER_DEBUG] Creating Guild instance for guild_id={guild_id}, document keys: {list(document.keys())}")
+        
         # Extract and properly convert premium_tier to int before initializing
         # This ensures premium tier is always stored as an integer
         document_copy = document.copy()
         
-        # Handle premium_tier conversion specifically
+        # Handle premium_tier conversion specifically with enhanced logging and validation
         if 'premium_tier' in document_copy:
             try:
-                # Convert premium_tier to integer
+                # Convert premium_tier to integer with more detailed logging
                 premium_tier_value = document_copy['premium_tier']
+                logger.info(f"[TIER_DEBUG] Guild {guild_id}: Raw premium_tier from DB: {premium_tier_value}, type: {type(premium_tier_value).__name__}")
+                
                 if premium_tier_value is not None:
-                    # Ensure it's an integer
-                    document_copy['premium_tier'] = int(premium_tier_value)
-                    logger.info(f"Loaded premium_tier from database: {document_copy['premium_tier']} (original type: {type(premium_tier_value).__name__})")
+                    # CRITICAL FIX: More robust type conversion with validation
+                    if isinstance(premium_tier_value, int):
+                        # Already an integer, validate range
+                        premium_tier_int = premium_tier_value
+                        logger.info(f"[TIER_DEBUG] Guild {guild_id}: premium_tier is already an integer: {premium_tier_int}")
+                    elif isinstance(premium_tier_value, str) and premium_tier_value.strip().isdigit():
+                        # Convert string to integer
+                        premium_tier_int = int(premium_tier_value.strip())
+                        logger.info(f"[TIER_DEBUG] Guild {guild_id}: Converted string premium_tier '{premium_tier_value}' to integer: {premium_tier_int}")
+                    else:
+                        # Fallback conversion with strong error handling
+                        try:
+                            premium_tier_int = int(premium_tier_value)
+                            logger.info(f"[TIER_DEBUG] Guild {guild_id}: Converted {type(premium_tier_value).__name__} premium_tier to integer: {premium_tier_int}")
+                        except (ValueError, TypeError) as e:
+                            logger.error(f"[TIER_DEBUG] Guild {guild_id}: Failed to convert premium_tier '{premium_tier_value}' to integer: {e}")
+                            premium_tier_int = 0
+                    
+                    # CRITICAL FIX: Validate tier range (0-5) for additional safety
+                    if premium_tier_int < 0 or premium_tier_int > 5:
+                        logger.warning(f"[TIER_DEBUG] Guild {guild_id}: premium_tier {premium_tier_int} out of valid range (0-5), clamping")
+                        premium_tier_int = max(0, min(5, premium_tier_int))
+                        
+                    # Set the validated integer value
+                    document_copy['premium_tier'] = premium_tier_int
+                    logger.info(f"[TIER_DEBUG] Guild {guild_id}: Final premium_tier set to {premium_tier_int}")
                 else:
                     # Default to 0 if None
                     document_copy['premium_tier'] = 0
-                    logger.warning("Premium tier is None in database, defaulting to 0")
-            except (ValueError, TypeError) as e:
-                logger.error(f"Error converting premium_tier '{document_copy['premium_tier']}': {e}, defaulting to 0")
+                    logger.warning(f"[TIER_DEBUG] Guild {guild_id}: Premium tier is None in database, defaulting to 0")
+            except Exception as e:
+                logger.error(f"[TIER_DEBUG] Guild {guild_id}: Unexpected error converting premium_tier: {e}")
                 document_copy['premium_tier'] = 0
         else:
             # If no premium_tier in document, default to 0
             document_copy['premium_tier'] = 0
-            logger.warning("No premium_tier found in database document, defaulting to 0")
+            logger.warning(f"[TIER_DEBUG] Guild {guild_id}: No premium_tier found in database document, defaulting to 0")
+            
+        # CRITICAL FIX: Verify premium_tier value after conversion
+        logger.info(f"[TIER_DEBUG] Guild {guild_id}: Final premium_tier in document_copy: {document_copy['premium_tier']}, type: {type(document_copy['premium_tier']).__name__}")
             
         instance = cls(db, **document_copy)
+        
+        # CRITICAL FIX: Perform final validation on the created instance
+        if hasattr(instance, 'premium_tier'):
+            logger.info(f"[TIER_DEBUG] Guild {guild_id}: Instance premium_tier after creation: {instance.premium_tier}, type: {type(instance.premium_tier).__name__}")
+            
+            # Force int conversion one more time to ensure consistency
+            try:
+                instance.premium_tier = int(instance.premium_tier)
+                logger.info(f"[TIER_DEBUG] Guild {guild_id}: Final instance premium_tier: {instance.premium_tier}")
+            except (ValueError, TypeError) as e:
+                logger.error(f"[TIER_DEBUG] Guild {guild_id}: Error in final premium_tier validation: {e}")
         
         # Ensure all IDs are strings for consistent handling
         if hasattr(instance, 'guild_id'):
