@@ -760,7 +760,6 @@ class Stats(commands.Cog):
                 if hasattr(item, "custom_id") and item.custom_id.startswith("pagination_"):
                     item.callback = pagination_callback
 
-        ```python
         except Exception as e:
             logger.error(f"Error getting player stats: {e}", exc_info=True)
             embed = await EmbedBuilder.create_error_embed(
@@ -816,7 +815,7 @@ class Stats(commands.Cog):
                 await ctx.send(embed=embed)
                 return
 
-            # Check if the is not None guild has access to stats feature
+            # Check if the guild has access to stats feature
             guild = Guild(self.bot.db, guild_data)
             if guild is None or not await guild.check_feature_access("stats"):
                     embed = await EmbedBuilder.create_error_embed(
@@ -1298,7 +1297,7 @@ class Stats(commands.Cog):
                 await ctx.send(embed=embed)
                 return
 
-            # Check if the is not None guild has access to stats feature
+            # Check if the guild has access to stats feature
             guild = Guild(self.bot.db, guild_data)
             if guild is None or not await guild.check_feature_access("stats"):
                 embed = await EmbedBuilder.create_error_embed(
