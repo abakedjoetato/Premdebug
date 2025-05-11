@@ -389,7 +389,7 @@ async def has_feature_access(guild_model, feature_name: str) -> bool:
 
         # For Guild objects, use the standard method
         try:
-            has_access = guild_model.check_feature_access(feature_name)
+            has_access = await guild_model.check_feature_access(feature_name)
             logger.info(f"[PREMIUM_DEBUG] Feature inheritance check for '{feature_name}': access granted: {has_access}")
             return has_access
         except Exception as check_err:
