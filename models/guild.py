@@ -462,7 +462,48 @@ class Guild(BaseModel):
         if feature_name is None or not isinstance(feature_name, str) or not feature_name.strip():
             logger.warning(f"[PREMIUM_DEBUG] Invalid feature name: {feature_name!r}")
             return False
+
+        # Handle case when self is a dictionary (happens during serialization/deserialization)
+        if isinstance(self, dict):
+            logger.info(f"[PREMIUM_DEBUG] Handling dictionary guild object for feature '{feature_name}'")
+            try:
+                guild_id = self.get('guild_id', 'unknown')
+                premium_tier_value = self.get('premium_tier', 0)
+                
+                # Ensure premium_tier is an integer
+                if premium_tier_value is None:
+                    guild_tier = 0
+                else:
+                    try:
+                        guild_tier = int(premium_tier_value)
+                    except (ValueError, TypeError):
+                        logger.warning(f"[PREMIUM_DEBUG] Invalid premium_tier in dict: {premium_tier_value}, defaulting to 0")
+                        guild_tier = 0
+                
+                logger.info(f"[PREMIUM_DEBUG] Dict guild {guild_id} has tier {guild_tier}")
+                
+                # Apply tier inheritance logic
+                if guild_tier >= 4:  # Highest tier
+                    logger.info(f"[PREMIUM_DEBUG] Dict guild {guild_id} has tier {guild_tier} >= 4, granting all access")
+                    return True
+                    
+                if feature_name in ['stats', 'leaderboards', 'basic_stats'] and guild_tier >= 1:
+                    logger.info(f"[PREMIUM_DEBUG] Fast-path access for essential feature '{feature_name}' with dict tier {guild_tier}")
+                    return True
+                    
+                if feature_name in PREMIUM_FEATURES:
+                    min_tier_required = PREMIUM_FEATURES.get(feature_name, 999)
+                    has_access = guild_tier >= min_tier_required
+                    logger.info(f"[PREMIUM_DEBUG] Dict feature check: '{feature_name}' requires tier {min_tier_required}, guild has tier {guild_tier}, access: {has_access}")
+                    return has_access
+                    
+                logger.warning(f"[PREMIUM_DEBUG] Dict feature '{feature_name}' not found in PREMIUM_FEATURES")
+                return False
+            except Exception as e:
+                logger.error(f"[PREMIUM_DEBUG] Error in dict premium check: {e}")
+                return False
             
+        # For normal object instances:
         # Check for guild_id to provide better logging context
         guild_id = getattr(self, 'guild_id', 'unknown')
             
