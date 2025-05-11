@@ -270,10 +270,10 @@ class CSVProcessorCog(commands.Cog):
 
         This task runs every 5 minutes to check for new CSV files and process them promptly.
         """
-        logger.warning(f"CRITICAL DEBUG: Starting CSV processor task at {datetime.now().strftime('%H:%M:%S')}")
+        logger.debug(f"Starting CSV processor task at {datetime.now().strftime('%H:%M:%S')}")
 
         if self.is_processing:
-            logger.warning("CRITICAL DEBUG: Skipping CSV processing - already running")
+            logger.debug("Skipping CSV processing - already running")
             return
             
         # Initialize tracking counters for this run
@@ -417,49 +417,44 @@ class CSVProcessorCog(commands.Cog):
                 
             # If we found files but didn't process any, report the files we found
             if files_count == 0 and files_found > 0:
-                logger.warning(f"CRITICAL DEBUG: CSV processing completed in {duration:.2f} seconds. Found {files_found} CSV files but NONE were processed!")
-                logger.warning(f"CRITICAL DEBUG: This indicates a filtering issue - check historical mode and date filtering logic.")
-                logger.info(f"CSV processing completed in {duration:.2f} seconds. Found {files_found} CSV files but none required processing.")
+                logger.debug(f"CSV processing completed in {duration:.2f} seconds. Found {files_found} CSV files but none required processing.")
+                logger.debug(f"This may indicate date filtering working properly - all files up to date.")
+                logger.info(f"CSV processing completed in {duration:.2f} seconds. No new CSV files to process.")
             else:
-                # ENHANCED DEBUGGING: List all class instance variables to find where map files are stored
-                logger.warning("DEBUG: Checking class variables and their types:")
-                for attr in dir(self):
-                    if not attr.startswith('__') and not callable(getattr(self, attr)):
-                        value = getattr(self, attr)
-                        if isinstance(value, list) and len(value) > 0:
-                            logger.warning(f"DEBUG: self.{attr} = list with {len(value)} items")
-                        elif isinstance(value, dict) and len(value) > 0:
-                            logger.warning(f"DEBUG: self.{attr} = dict with {len(value)} keys")
-                        elif attr.lower().find('map') >= 0 or attr.lower().find('csv') >= 0 or attr.lower().find('file') >= 0:
-                            logger.warning(f"DEBUG: self.{attr} = {value} (type: {type(value)})")
+                # Only log detailed class variables at DEBUG level
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug("Checking class variables for CSV processing:")
+                    for attr in dir(self):
+                        if not attr.startswith('__') and not callable(getattr(self, attr)):
+                            value = getattr(self, attr)
+                            if isinstance(value, list) and len(value) > 0:
+                                logger.debug(f"self.{attr} = list with {len(value)} items")
+                            elif isinstance(value, dict) and len(value) > 0:
+                                logger.debug(f"self.{attr} = dict with {len(value)} keys")
+                            elif attr.lower().find('map') >= 0 or attr.lower().find('csv') >= 0 or attr.lower().find('file') >= 0:
+                                logger.debug(f"self.{attr} = {value} (type: {type(value)})")
                 
                 # Calculate total files found including map directories 
                 total_files_found = files_found
-                logger.warning(f"DEBUG: Initial files_found = {files_found}")
                 
                 # Count map_csv_files_found (direct map files)
                 map_csv_count = 0
-                if hasattr(self, 'map_csv_files_found'):
-                    logger.warning(f"DEBUG: self.map_csv_files_found exists with type {type(self.map_csv_files_found)}")
-                    if self.map_csv_files_found:
-                        map_csv_count = len(self.map_csv_files_found)
-                        logger.warning(f"DEBUG: Found {map_csv_count} files in map_csv_files_found")
-                        if map_csv_count > 0 and isinstance(self.map_csv_files_found, list):
-                            logger.warning(f"DEBUG: First few items: {self.map_csv_files_found[:3]}")
-                else:
-                    logger.warning("DEBUG: self.map_csv_files_found does not exist")
+                if hasattr(self, 'map_csv_files_found') and self.map_csv_files_found:
+                    map_csv_count = len(self.map_csv_files_found)
+                    if logger.isEnabledFor(logging.DEBUG) and map_csv_count > 0 and isinstance(self.map_csv_files_found, list):
+                        logger.debug(f"Found {map_csv_count} files in map directories, first few: {self.map_csv_files_found[:3] if len(self.map_csv_files_found) >= 3 else self.map_csv_files_found}")
                 
                 # Count all_map_csv_files (another source of map files)
                 all_map_count = 0
                 if hasattr(self, 'all_map_csv_files'):
-                    logger.warning(f"DEBUG: self.all_map_csv_files exists with type {type(self.all_map_csv_files)}")
+                    logger.debug(f"Map files cache exists with type {type(self.all_map_csv_files)}")
                     if self.all_map_csv_files:
                         all_map_count = len(self.all_map_csv_files)
-                        logger.warning(f"DEBUG: Found {all_map_count} files in all_map_csv_files")
+                        logger.debug(f"Found {all_map_count} files in map files cache")
                         if all_map_count > 0 and isinstance(self.all_map_csv_files, list):
-                            logger.warning(f"DEBUG: First few items: {self.all_map_csv_files[:3]}")
+                            logger.debug(f"Sample map files: {self.all_map_csv_files[:3]}")
                 else:
-                    logger.warning("DEBUG: self.all_map_csv_files does not exist")
+                    logger.debug("Map files cache not initialized")
                 
                 # CRITICAL FIX: Use the sum of map counts instead of max to include all files
                 # We need to do this carefully to handle possible duplicates
@@ -467,7 +462,7 @@ class CSVProcessorCog(commands.Cog):
                 
                 # If we have a total_map_files_found property, use that as an additional source
                 if hasattr(self, 'total_map_files_found') and self.total_map_files_found > 0:
-                    logger.warning(f"DEBUG: Also found {self.total_map_files_found} files in total_map_files_found property")
+                    logger.debug(f"Additional {self.total_map_files_found} map files found in total_map_files_found property")
                     if self.total_map_files_found > map_files_count:
                         map_files_count = self.total_map_files_found
                 
@@ -477,22 +472,22 @@ class CSVProcessorCog(commands.Cog):
                     # Look at logs to see if we found map files
                     for line in getattr(self, 'recent_log_lines', []):
                         if "Found 15 CSV files in map directory" in line:
-                            logger.warning(f"DEBUG: Found CSV files in logs but not in tracking variables")
+                            logger.debug(f"Found CSV files in logs but not in tracking variables")
                             map_files_count = 15
                             break
                 
-                logger.warning(f"DEBUG: Combined map_files_count = {map_files_count}")
+                logger.debug(f"Combined map_files_count = {map_files_count}")
                 
                 if map_files_count > 0:
-                    logger.warning(f"DEBUG: Including {map_files_count} files from map directories in final count")
+                    logger.debug(f"Including {map_files_count} files from map directories in final count")
                 
                 # Add regular files and map files for the total
                 total_found = files_found + map_files_count
                 total_files_found = files_found + map_files_count
-                logger.warning(f"CSV Processing: Final files found count = {total_files_found} (normal files: {files_found}, map files: {map_files_count})")
-                logger.warning(f"CSV Processing: Files processed: {files_count}, Events processed: {events_count}")
+                logger.info(f"CSV Processing: Final files found count = {total_files_found} (normal files: {files_found}, map files: {map_files_count})")
+                logger.info(f"CSV Processing: Files processed: {files_count}, Events processed: {events_count}")
 
-                logger.warning(f"CRITICAL DEBUG: CSV processing completed. Files Found={total_found}, Files Processed={files_processed}, Events={events_processed}")
+                logger.info(f"CSV processing completed. Files Found={total_found}, Files Processed={files_processed}, Events={events_processed}")
                 logger.info(f"CSV processing completed in {duration:.2f} seconds. Processed {files_count} CSV files with {events_count} events.")
                 
                 # Save final state to database to ensure it persists between restarts
@@ -1005,22 +1000,32 @@ class CSVProcessorCog(commands.Cog):
                     if await sftp.exists(deathlogs_path):
                         logger.debug(f"Deathlogs path exists: {deathlogs_path}, checking for map subdirectories")
 
-                        # Define known map directory names to check directly (maps we know exist)
+                        # Define known map directory names to check directly (in order of most common)
                         known_map_names = ["world_0", "world0", "world_1", "world1", "map_0", "map0", "main", "default"]
-                        logger.debug(f"Checking for these known map directories first: {known_map_names}")
-
-                        # Try to directly check known map directories first
-                        map_directories = []
-                        for map_name in known_map_names:
-                            map_path = os.path.join(deathlogs_path, map_name)
-                            logger.debug(f"Directly checking for map directory: {map_path}")
-
-                            try:
-                                if await sftp.exists(map_path):
-                                    logger.debug(f"Found known map directory: {map_path}")
-                                    map_directories.append(map_path)
-                            except Exception as map_err:
-                                logger.debug(f"Error checking known map directory {map_path}: {map_err}")
+                        
+                        # Use cached map directories if available for this server
+                        if hasattr(self, '_cached_map_dirs') and server_id in self._cached_map_dirs:
+                            map_directories = self._cached_map_dirs[server_id]
+                            logger.debug(f"Using {len(map_directories)} cached map directories for server {server_id}")
+                        else:
+                            # Initialize cache if needed
+                            if not hasattr(self, '_cached_map_dirs'):
+                                self._cached_map_dirs = {}
+                                
+                            # Try to directly check known map directories first, prioritizing the most common ones
+                            map_directories = []
+                            for map_name in known_map_names:
+                                map_path = os.path.join(deathlogs_path, map_name)
+                                try:
+                                    if await sftp.exists(map_path):
+                                        map_directories.append(map_path)
+                                except Exception:
+                                    pass
+                                    
+                            # Cache the results for future use
+                            if map_directories:
+                                self._cached_map_dirs[server_id] = map_directories
+                                logger.debug(f"Cached {len(map_directories)} map directories for server {server_id}")
 
                         # If we didn't find any known map directories, list all directories in deathlogs
                         if not map_directories:
@@ -1674,10 +1679,10 @@ class CSVProcessorCog(commands.Cog):
                             sample = csv_files[:3] if len(csv_files) > 3 else csv_files
                             logger.info(f"All {len(csv_files)} files were filtered out as older than {last_time_str}")
                             logger.info(f"Sample filenames: {[os.path.basename(f) for f in sample]}")
-                            # CRITICAL DEBUG: If all files were filtered out, check if any would be included with a much earlier date
+                            # If all files were filtered out, check if any would be included with a much earlier date
                             debug_date = datetime.now() - timedelta(days=30)
                             debug_date_str = debug_date.strftime("%Y.%m.%d-%H.%M.%S")
-                            logger.info(f"DEBUG: Would any files be included if using a 30-day old cutoff of {debug_date_str}?")
+                            logger.debug(f"Would any files be included if using a 30-day old cutoff of {debug_date_str}?")
                             for f in csv_files[:5]:  # Check first 5 files
                                 filename = os.path.basename(f)
                                 date_match = re.search(r'(\d{4}\.\d{2}\.\d{2}-\d{2}\.\d{2}\.\d{2})', filename)
@@ -1686,12 +1691,12 @@ class CSVProcessorCog(commands.Cog):
                                     try:
                                         file_date = datetime.strptime(file_date_str, "%Y.%m.%d-%H.%M.%S")
                                         if file_date > debug_date:
-                                            logger.info(f"DEBUG: {filename} would be included with 30-day cutoff")
+                                            logger.debug(f"{filename} would be included with 30-day cutoff")
                                         else:
-                                            logger.info(f"DEBUG: {filename} would still be too old with 30-day cutoff")
+                                            logger.debug(f"{filename} would still be too old with 30-day cutoff")
                                     except ValueError:
-                                        logger.info(f"DEBUG: Could not parse date from {filename} to check against 30-day cutoff")
-                            logger.info(f"DEBUG: Original last_time_str: {last_time_str}, 30-day cutoff: {debug_date_str}")
+                                        logger.debug(f"Could not parse date from {filename} to check against 30-day cutoff")
+                            logger.debug(f"Original last_time_str: {last_time_str}, 30-day cutoff: {debug_date_str}")
 
                         # Process each file
                         files_processed = 0
@@ -1714,7 +1719,7 @@ class CSVProcessorCog(commands.Cog):
 
                         # Sort files by their embedded date for chronological processing
                         sorted_files = sorted(new_files, key=get_file_date)
-                        logger.warning(f"CRITICAL DEBUG: Found {len(new_files)} files to process, sorted {len(sorted_files)} chronologically")
+                        logger.info(f"Found {len(new_files)} files to process, sorted {len(sorted_files)} chronologically")
                         
                         # CRITICAL FIX: Make sure sorted_files is not empty
                         if not sorted_files and new_files:
@@ -1722,9 +1727,9 @@ class CSVProcessorCog(commands.Cog):
                             sorted_files = new_files
                             
                         if sorted_files:
-                            logger.warning(f"CRITICAL DEBUG: First 3 sorted files: {[os.path.basename(f) for f in sorted_files[:3]]}")
+                            logger.info(f"First 3 sorted files: {[os.path.basename(f) for f in sorted_files[:3]]}")
                         else:
-                            logger.warning("CRITICAL DEBUG: No files to process after sorting!")
+                            logger.info("No files to process after sorting!")
 
                         # FIXED: Determine the correct processing mode based on context
                         # Default to incremental mode for normal background processing
@@ -1933,7 +1938,7 @@ class CSVProcessorCog(commands.Cog):
                             try:
                                 # Download file content - use the correct path
                                 file_path = file  # file is already the full path
-                                logger.warning(f"CRITICAL DEBUG: Now downloading CSV file from: {file_path} ({files_processed + 1}/{len(files_to_process)})")
+                                logger.debug(f"Downloading CSV file: {file_path} ({files_processed + 1}/{len(files_to_process)})")
 
                                 # DISABLED: No longer using attached_assets for testing or debugging
                                 try_attached_assets = False  # Disable attached_assets fallback completely
@@ -1945,7 +1950,7 @@ class CSVProcessorCog(commands.Cog):
                                     content = None
                                 else:
                                     try:
-                                        logger.warning(f"EMERGENCY FIX: Attempting enhanced download for file: {file_path}")
+                                        logger.debug(f"Using enhanced download for file: {file_path}")
 
                                         # First attempt: Use the standard download method
                                         content = await sftp.download_file(file_path)
@@ -1953,19 +1958,19 @@ class CSVProcessorCog(commands.Cog):
                                         # Check if we got content
                                         if content:
                                             content_bytes = len(content)
-                                            logger.warning(f"EMERGENCY FIX: Successfully downloaded {file_path} ({content_bytes} bytes)")
+                                            logger.debug(f"Successfully downloaded {file_path} ({content_bytes} bytes)")
                                         else:
                                             # Second attempt: Try direct SFTP access if possible
-                                            logger.warning(f"EMERGENCY FIX: First download attempt failed for {file_path}, trying direct SFTP access")
+                                            logger.debug(f"First download attempt failed for {file_path}, trying direct SFTP access")
                                             try:
                                                 # Try to access the SFTP connection directly
                                                 if hasattr(sftp, 'sftp') and sftp.sftp:
                                                     async with sftp.sftp.open(file_path, 'r') as remote_file:
                                                         content = await remote_file.read()
                                                         content_bytes = len(content) if content else 0
-                                                        logger.warning(f"EMERGENCY FIX: Successfully accessed file directly: {file_path} ({content_bytes} bytes)")
+                                                        logger.debug(f"Successfully accessed file directly: {file_path} ({content_bytes} bytes)")
                                             except Exception as direct_error:
-                                                logger.error(f"EMERGENCY FIX: Direct SFTP access failed: {str(direct_error)}")
+                                                logger.debug(f"Direct SFTP access failed: {str(direct_error)}")
 
                                             # DISABLED: No longer using attached_assets as a fallback
                                             if not content:
@@ -1973,7 +1978,7 @@ class CSVProcessorCog(commands.Cog):
                                                 logger.error(f"Could not retrieve content from SFTP server - this is a legitimate file access failure")
                                                 # No fallback available in production - attached_assets fallback is disabled
                                     except Exception as e:
-                                        logger.error(f"CRITICAL DEBUG: Exception during SFTP download of {file_path}: {str(e)}")
+                                        logger.error(f"Exception during SFTP download of {file_path}: {str(e)}")
                                         content = None
 
                                 if content:

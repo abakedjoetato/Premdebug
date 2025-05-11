@@ -1356,7 +1356,7 @@ class SFTPManager:
 
                 # Handle None results safely
                 if not files:
-                    logger.warning(f"find_csv_files returned None for {directory}")
+                    logger.debug(f"find_csv_files returned None for {directory}")
                     return []
 
                 # Log success
@@ -3713,24 +3713,35 @@ class SFTPClient:
             if not await self.exists(deathlogs_path):
                 logger.warning(f"Main deathlogs path does not exist: {deathlogs_path}")
 
-                # Try alternate paths
+                # Try alternate paths (in order of most likely to succeed based on server configurations)
                 alternate_paths = [
                     os.path.join("/", server_dir, "deathlogs"),
                     os.path.join("/", server_dir, "logs"),
                     os.path.join("/", server_dir, "Logs"),
-                    os.path.join("/", "deathlogs"),
-                    os.path.join("/", server_dir)
+                    os.path.join("/", server_dir) # Server root directory
                 ]
-
-                for alt_path in alternate_paths:
-                    logger.debug(f"Trying alternate path: {alt_path}")
-                    if await self.exists(alt_path):
-                        deathlogs_path = alt_path
-                        logger.debug(f"Using alternate path: {deathlogs_path}")
-                        break
+                
+                # Cache server paths to avoid excessive lookups across multiple calls
+                # Try to use cached path if available
+                if hasattr(self, '_cached_valid_path') and self._cached_valid_path:
+                    logger.debug(f"Using cached valid path: {self._cached_valid_path}")
+                    deathlogs_path = self._cached_valid_path
                 else:
-                    logger.error(f"Could not find any valid path for server {self.server_id}")
-                    return None
+                    # Only search if not already cached
+                    path_found = False
+                    for alt_path in alternate_paths:
+                        if await self.exists(alt_path):
+                            deathlogs_path = alt_path
+                            # Cache for future lookups
+                            self._cached_valid_path = alt_path
+                            logger.debug(f"Found and cached valid path: {deathlogs_path}")
+                            path_found = True
+                            break
+                    
+                    # If no path was found after all attempts
+                    if not path_found:
+                        logger.error(f"Could not find any valid path for server {self.server_id}")
+                        return None
 
             # First try to get entries in the deathlogs directory - these could be map subdirectories
             try:
