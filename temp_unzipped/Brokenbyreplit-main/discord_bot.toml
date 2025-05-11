@@ -1,4 +1,0 @@
-# Discord bot workflow configuration
-command = "python main.py"
-isBackground = false
-triggersIntegration = true
