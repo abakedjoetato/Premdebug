@@ -468,17 +468,63 @@ class Guild(BaseModel):
             logger.info(f"[PREMIUM_DEBUG] Handling dictionary guild object for feature '{feature_name}'")
             try:
                 guild_id = self.get('guild_id', 'unknown')
-                premium_tier_value = self.get('premium_tier', 0)
                 
-                # Ensure premium_tier is an integer
-                if premium_tier_value is None:
-                    guild_tier = 0
-                else:
+                # CRITICAL FIX: More aggressive premium tier extraction from dictionary
+                # First try premium_tier directly
+                premium_tier_value = self.get('premium_tier')
+                
+                # If None or not present, try _doc or the document itself for MongoDB objects
+                if premium_tier_value is None and hasattr(self, '_doc'):
+                    premium_tier_value = self._doc.get('premium_tier')
+                
+                # If still None and we have _id, try direct DB lookup
+                if premium_tier_value is None and self.get('_id') and hasattr(self, 'db'):
                     try:
-                        guild_tier = int(premium_tier_value)
+                        from utils.database import get_db
+                        db = self.get('db')
+                        if db is None:
+                            db = get_db()
+                        guild_doc = db.guilds.find_one({"_id": self.get('_id')})
+                        if guild_doc and 'premium_tier' in guild_doc:
+                            premium_tier_value = guild_doc.get('premium_tier')
+                            logger.info(f"[PREMIUM_DEBUG] Retrieved premium_tier {premium_tier_value} directly from DB")
+                    except Exception as db_err:
+                        logger.error(f"[PREMIUM_DEBUG] DB lookup error: {db_err}")
+                
+                # Ensure premium_tier is an integer with robust conversion
+                guild_tier = 0  # Default tier
+                if premium_tier_value is not None:
+                    try:
+                        if isinstance(premium_tier_value, int):
+                            guild_tier = premium_tier_value
+                        elif isinstance(premium_tier_value, str) and premium_tier_value.strip().isdigit():
+                            guild_tier = int(premium_tier_value.strip())
+                        else:
+                            guild_tier = int(premium_tier_value)
                     except (ValueError, TypeError):
-                        logger.warning(f"[PREMIUM_DEBUG] Invalid premium_tier in dict: {premium_tier_value}, defaulting to 0")
+                        logger.warning(f"[PREMIUM_DEBUG] Could not convert premium_tier {premium_tier_value} to integer, defaulting to 0")
                         guild_tier = 0
+                
+                # CRITICAL FIX: Handle special case where premium_tier might be directly on the guild object
+                if guild_tier == 0 and '_id' in self:
+                    # Try to get from database
+                    try:
+                        from utils.database import get_db
+                        db = await get_db()
+                        guild_doc = await db.guilds.find_one({"guild_id": str(guild_id)})
+                        if guild_doc and 'premium_tier' in guild_doc:
+                            db_tier = guild_doc.get('premium_tier')
+                            if db_tier is not None:
+                                try:
+                                    guild_tier = int(db_tier)
+                                    logger.info(f"[PREMIUM_DEBUG] Retrieved tier {guild_tier} from database")
+                                except (ValueError, TypeError):
+                                    pass
+                    except Exception as db_err:
+                        logger.error(f"[PREMIUM_DEBUG] Error in DB lookup: {db_err}")
+                
+                # Ensure tier is within valid range
+                guild_tier = max(0, min(5, guild_tier))
                 
                 logger.info(f"[PREMIUM_DEBUG] Dict guild {guild_id} has tier {guild_tier}")
                 
@@ -523,7 +569,23 @@ class Guild(BaseModel):
                     self.premium_tier = guild_tier
                     logger.info(f"[PREMIUM_DEBUG] Converted premium_tier from {type(self.premium_tier).__name__} to int: {guild_tier}")
             else:
+                # CRITICAL FIX: If premium_tier not found on object, try direct DB lookup
                 guild_tier = 0
+                try:
+                    if hasattr(self, 'db') and self.db is not None and hasattr(self, 'guild_id'):
+                        guild_doc = await self.db.guilds.find_one({"guild_id": str(self.guild_id)})
+                        if guild_doc and 'premium_tier' in guild_doc:
+                            db_tier = guild_doc.get('premium_tier')
+                            if db_tier is not None:
+                                try:
+                                    guild_tier = int(db_tier)
+                                    # Set the tier on the object for future use
+                                    self.premium_tier = guild_tier
+                                    logger.info(f"[PREMIUM_DEBUG] Retrieved and set tier {guild_tier} from database")
+                                except (ValueError, TypeError):
+                                    pass
+                except Exception as db_err:
+                    logger.error(f"[PREMIUM_DEBUG] Error in direct DB lookup: {db_err}")
         except (ValueError, TypeError):
             logger.warning(f"[PREMIUM_DEBUG] Invalid premium_tier value: {getattr(self, 'premium_tier', None)}, defaulting to 0")
             guild_tier = 0
