@@ -124,7 +124,7 @@ class Events(commands.Cog):
     @events.command(name="start", description="Start monitoring events for a server")
     @app_commands.describe(server_id="Select a server by name to monitor")
     @app_commands.autocomplete(server_id=server_id_autocomplete)
-    @premium_tier_required(1)  # Events monitoring requires premium tier 1+
+    @premium_tier_required(feature_name="events")  # Events monitoring requires premium tier 1+
     async def start(self, ctx, server_id: str):
         """Start the events monitor for a server"""
 
@@ -311,7 +311,7 @@ class Events(commands.Cog):
             await ctx.send(embed=embed)
 
     @events.command(name="status", description="Check events monitor status")
-    @premium_tier_required(1)  # Events monitoring requires premium tier 1+
+    @premium_tier_required(feature_name="events")  # Events monitoring requires premium tier 1+
     async def status(self, ctx):
         """Check the status of events monitors for this guild"""
 
@@ -438,7 +438,7 @@ class Events(commands.Cog):
         app_commands.Choice(name="Server Restarts", value="server_restart")
     ])
     @app_commands.autocomplete(server_id=server_id_autocomplete)
-    @premium_tier_required(1)  # Events monitoring requires premium tier 1+
+    @premium_tier_required(feature_name="events")  # Events monitoring requires premium tier 1+
     async def list_events(self, ctx, server_id: str, event_type: str = "all", limit: int = 10):
         """List recent events for a server"""
 
@@ -584,7 +584,7 @@ class Events(commands.Cog):
     @events.command(name="players", description="List online players for a server")
     @app_commands.describe(server_id="Select a server by name to list players for")
     @app_commands.autocomplete(server_id=server_id_autocomplete)
-    @premium_tier_required(1)  # Player connections requires premium tier 1+
+    @premium_tier_required(feature_name="events")  # Player connections requires premium tier 1+
     async def online_players(self, ctx, server_id: str):
         """List online players for a server"""
 
@@ -707,7 +707,7 @@ class Events(commands.Cog):
         server_restart="Enable server restart notifications (True/False)"
     )
     @app_commands.autocomplete(server_id=server_id_autocomplete)
-    @premium_tier_required(1)  # Events configuration requires premium tier 1+
+    @premium_tier_required(feature_name="events")  # Events configuration requires premium tier 1+
     async def configure_events(self, ctx, server_id: str, 
                              mission: Optional[bool] = None,
                              airdrop: Optional[bool] = None,
@@ -846,7 +846,7 @@ class Events(commands.Cog):
         disconnect="Enable player disconnection notifications (True/False)"
     )
     @app_commands.autocomplete(server_id=server_id_autocomplete)
-    @premium_tier_required(1)  # Connection configuration requires premium tier 1+
+    @premium_tier_required(feature_name="events")  # Connection configuration requires premium tier 1+
     async def configure_connections(self, ctx, server_id: str, 
                                 connect: Optional[bool] = None,
                                 disconnect: Optional[bool] = None):
@@ -970,7 +970,7 @@ class Events(commands.Cog):
         other="Enable other suicide notifications (True/False)"
     )
     @app_commands.autocomplete(server_id=server_id_autocomplete)
-    @premium_tier_required(1)  # Suicide notification configuration requires premium tier 1+
+    @premium_tier_required(feature_name="events")  # Suicide notification configuration requires premium tier 1+
     async def configure_suicides(self, ctx, server_id: str, 
                                menu: Optional[bool] = None,
                                fall: Optional[bool] = None,

@@ -883,7 +883,7 @@ class LogProcessorCog(commands.Cog):
         description="Manually process game log files"
     )
     @admin_permission_decorator()
-    @premium_tier_required(1)  # Require Survivor tier for log processing
+    @premium_tier_required(feature_name="stats")  # Require Survivor tier for log processing
     @app_commands.autocomplete(server_id=server_id_autocomplete)
     async def process_logs_command(
         self,
@@ -966,7 +966,7 @@ class LogProcessorCog(commands.Cog):
         description="Show log processor status"
     )
     @admin_permission_decorator()
-    @premium_tier_required(1)  # Require Survivor tier for log status
+    @premium_tier_required(feature_name="stats")  # Require Survivor tier for log status
     async def log_status_command(self, interaction: discord.Interaction):
         """Show log processor status
 

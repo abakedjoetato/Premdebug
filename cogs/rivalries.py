@@ -77,7 +77,7 @@ class RivalriesCog(commands.Cog):
 
         return player_id
 
-    @premium_tier_required(3)  # Rivalries require premium tier 3+
+    @premium_tier_required(feature_name="rivalries")  # Rivalries require premium tier 3+
     async def context_view_rivalries(self, interaction: discord.Interaction, member: discord.Member) -> None:
         """Context menu command to view a user's rivalries
 
@@ -186,7 +186,7 @@ class RivalriesCog(commands.Cog):
     rivalry_group = app_commands.Group(name="rivalry", description="View and manage rivalries")
 
     @rivalry_group.command(name="list")
-    @premium_tier_required(3)  # Rivalries require premium tier 3+
+    @premium_tier_required(feature_name="rivalries")  # Rivalries require premium tier 3+
     @app_commands.describe(
         server_id="The server ID (default: first available server)",
         limit="Maximum number of rivalries to show (default: 10)"
@@ -284,7 +284,7 @@ class RivalriesCog(commands.Cog):
             await paginate_embeds(interaction, embeds)
 
     @rivalry_group.command(name="player")
-    @premium_tier_required(3)  # Rivalries require premium tier 3+
+    @premium_tier_required(feature_name="rivalries")  # Rivalries require premium tier 3+
     @app_commands.describe(
         server_id="The server ID (default: first available server)",
         player_name="The player name to view rivalries for"
@@ -404,7 +404,7 @@ class RivalriesCog(commands.Cog):
             await paginate_embeds(interaction, embeds)
 
     @rivalry_group.command(name="top")
-    @premium_tier_required(3)  # Rivalries require premium tier 3+
+    @premium_tier_required(feature_name="rivalries")  # Rivalries require premium tier 3+
     @app_commands.describe(
         server_id="The server ID (default: first available server)",
         limit="Maximum number of rivalries to show (default: 10)"
@@ -483,7 +483,7 @@ class RivalriesCog(commands.Cog):
             await paginate_embeds(interaction, embeds)
 
     @rivalry_group.command(name="closest")
-    @premium_tier_required(3)  # Rivalries require premium tier 3+
+    @premium_tier_required(feature_name="rivalries")  # Rivalries require premium tier 3+
     @app_commands.describe(
         server_id="The server ID (default: first available server)",
         limit="Maximum number of rivalries to show (default: 10)"
@@ -562,7 +562,7 @@ class RivalriesCog(commands.Cog):
             await paginate_embeds(interaction, embeds)
 
     @rivalry_group.command(name="recent")
-    @premium_tier_required(3)  # Rivalries require premium tier 3+
+    @premium_tier_required(feature_name="rivalries")  # Rivalries require premium tier 3+
     @app_commands.describe(
         server_id="The server ID (default: first available server)",
         limit="Maximum number of rivalries to show (default: 10)",
@@ -645,7 +645,7 @@ class RivalriesCog(commands.Cog):
             await paginate_embeds(interaction, embeds)
 
     @rivalry_group.command(name="between")
-    @premium_tier_required(3)  # Rivalries require premium tier 3+
+    @premium_tier_required(feature_name="rivalries")  # Rivalries require premium tier 3+
     @app_commands.describe(
         server_id="The server ID (default: first available server)",
         player1="First player name",
@@ -732,7 +732,7 @@ class RivalriesCog(commands.Cog):
         await interaction.followup.send(embed=embed)
 
     @rivalry_group.command(name="record_kill")
-    @premium_tier_required(3)  # Rivalries require premium tier 3+
+    @premium_tier_required(feature_name="rivalries")  # Rivalries require premium tier 3+
     @app_commands.describe(
         server_id="The server ID",
         killer="Killer player name",

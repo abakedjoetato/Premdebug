@@ -21,11 +21,11 @@ from utils.discord_utils import server_id_autocomplete
 logger = logging.getLogger(__name__)
 
 
-async def player_name_autocomplete(interaction, current):
+async def player_name_autocomplete(interaction: discord.Interaction, current: str):
     """Autocomplete for player names"""
     try:
-        # Get user's guild ID and the server ID from the command options
-        guild_id = interaction.guild_id
+        # Get user's guild ID
+        guild_id = str(interaction.guild_id) if interaction.guild_id else None
 
         if guild_id is None:
             return [app_commands.Choice(name="Must use in a server", value="")]
@@ -33,20 +33,28 @@ async def player_name_autocomplete(interaction, current):
         # Try to get the server_id from the interaction
         server_id = None
         try:
-            for option in interaction.data.get("options", []):
-                if option.get("name") == "server_id":
-                    raw_id = option.get("value")
-                    server_id = str(raw_id) if raw_id else None
-                    logger.debug(f"player_name_autocomplete converting server_id from {type(raw_id).__name__} to string: {server_id}")
-                    break
-
-                # Check in subcommands
-                for suboption in option.get("options", []):
-                    if suboption.get("name") == "server_id":
-                        raw_id = suboption.get("value")
+            # First check if this is a direct command
+            if hasattr(interaction, 'namespace') and hasattr(interaction.namespace, 'server_id'):
+                server_id = str(interaction.namespace.server_id) if interaction.namespace.server_id else None
+                logger.debug(f"Found server_id in namespace: {server_id}")
+            
+            # Then try the data structure
+            if server_id is None and hasattr(interaction, 'data') and 'options' in interaction.data:
+                for option in interaction.data.get("options", []):
+                    if option.get("name") == "server_id":
+                        raw_id = option.get("value")
                         server_id = str(raw_id) if raw_id else None
-                        logger.debug(f"player_name_autocomplete (subcommand) converting server_id from {type(raw_id).__name__} to string: {server_id}")
+                        logger.debug(f"player_name_autocomplete: Found server_id in options: {server_id}")
                         break
+
+                    # Check in subcommands
+                    if server_id is None and "options" in option:
+                        for suboption in option.get("options", []):
+                            if suboption.get("name") == "server_id":
+                                raw_id = suboption.get("value")
+                                server_id = str(raw_id) if raw_id else None
+                                logger.debug(f"player_name_autocomplete: Found server_id in suboptions: {server_id}")
+                                break
         except Exception as e:
             logger.error(f"Error extracting server_id from interaction: {e}")
             server_id = None
@@ -155,11 +163,11 @@ async def player_name_autocomplete(interaction, current):
         return [app_commands.Choice(name="Error loading players", value="")]
 
 
-async def weapon_name_autocomplete(interaction, current):
+async def weapon_name_autocomplete(interaction: discord.Interaction, current: str):
     """Autocomplete for weapon names"""
     try:
-        # Get user's guild ID and the server ID from the command options
-        guild_id = interaction.guild_id
+        # Get user's guild ID
+        guild_id = str(interaction.guild_id) if interaction.guild_id else None
 
         if guild_id is None:
             return [app_commands.Choice(name="Must use in a server", value="")]
@@ -167,20 +175,28 @@ async def weapon_name_autocomplete(interaction, current):
         # Try to get the server_id from the interaction
         server_id = None
         try:
-            for option in interaction.data.get("options", []):
-                if option.get("name") == "server_id":
-                    raw_id = option.get("value")
-                    server_id = str(raw_id) if raw_id else None
-                    logger.debug(f"weapon_name_autocomplete converting server_id from {type(raw_id).__name__} to string: {server_id}")
-                    break
-
-                # Check in subcommands
-                for suboption in option.get("options", []):
-                    if suboption.get("name") == "server_id":
-                        raw_id = suboption.get("value")
+            # First check if this is a direct command
+            if hasattr(interaction, 'namespace') and hasattr(interaction.namespace, 'server_id'):
+                server_id = str(interaction.namespace.server_id) if interaction.namespace.server_id else None
+                logger.debug(f"weapon_name_autocomplete: Found server_id in namespace: {server_id}")
+            
+            # Then try the data structure
+            if server_id is None and hasattr(interaction, 'data') and 'options' in interaction.data:
+                for option in interaction.data.get("options", []):
+                    if option.get("name") == "server_id":
+                        raw_id = option.get("value")
                         server_id = str(raw_id) if raw_id else None
-                        logger.debug(f"weapon_name_autocomplete (subcommand) converting server_id from {type(raw_id).__name__} to string: {server_id}")
+                        logger.debug(f"weapon_name_autocomplete: Found server_id in options: {server_id}")
                         break
+
+                    # Check in subcommands
+                    if server_id is None and "options" in option:
+                        for suboption in option.get("options", []):
+                            if suboption.get("name") == "server_id":
+                                raw_id = suboption.get("value")
+                                server_id = str(raw_id) if raw_id else None
+                                logger.debug(f"weapon_name_autocomplete: Found server_id in suboptions: {server_id}")
+                                break
         except Exception as e:
             logger.error(f"Error extracting server_id from interaction in weapon_name_autocomplete: {e}")
             server_id = None
@@ -272,9 +288,19 @@ class Stats(commands.Cog):
 
     @commands.hybrid_group(name="stats", description="Statistics commands")
     @commands.guild_only()
+    @premium_tier_required(feature_name="stats")  # Using feature-based access control
     async def stats(self, ctx):
         """Stats command group"""
-        if not ctx.invoked_subcommand:
+        # Log premium access for debugging
+        logger.info(f"Stats command accessed by user {ctx.author.id} in guild {ctx.guild.id}")
+        
+        # Get guild model to verify premium tier
+        guild_model = await Guild.get_by_id(self.bot.db, ctx.guild.id)
+        if guild_model:
+            logger.info(f"Guild {ctx.guild.id} has premium tier: {guild_model.premium_tier}")
+            logger.info(f"Feature 'stats' access: {guild_model.check_feature_access('stats')}")
+        
+        if ctx.invoked_subcommand is None:
             await ctx.send("Please specify a subcommand.")
 
     @stats.command(name="player", description="View player statistics")
@@ -282,11 +308,8 @@ class Stats(commands.Cog):
         server_id="Select a server by name to check stats for",
         player_name="The player name to search for"
     )
-    @app_commands.autocomplete(
-        server_id=server_id_autocomplete,
-        player_name=player_name_autocomplete
-    )
-    @premium_tier_required(1)  # Stats require Tier 1+ (Survivor)
+    @app_commands.autocomplete(server_id=server_id_autocomplete, player_name=player_name_autocomplete)
+    @premium_tier_required(feature_name="stats")  # Stats require Tier 1+ (Survivor)
     async def player_stats(self, ctx, server_id: str, player_name: str):
         """View statistics for a player"""
         try:
@@ -748,7 +771,7 @@ class Stats(commands.Cog):
     @stats.command(name="server", description="View server statistics")
     @app_commands.describe(server_id="Select a server by name to check stats for")
     @app_commands.autocomplete(server_id=server_id_autocomplete)
-    @premium_tier_required(1)  # Stats require premium tier 1+
+    @premium_tier_required(feature_name="stats")  # Stats require premium tier 1+
     async def server_stats(self, ctx, server_id: str):
         """View statistics for a server"""
 
@@ -868,7 +891,7 @@ class Stats(commands.Cog):
         limit="Number of players to show (max 25)"
     )
     @app_commands.autocomplete(server_id=server_id_autocomplete)
-    @premium_tier_required(1)  # Requires Tier 1+ (Survivor)
+    @premium_tier_required(feature_name="stats")  # Requires Tier 1+ (Survivor)
     @app_commands.choices(stat=[
         app_commands.Choice(name="Kills", value="kills"),
         app_commands.Choice(name="Deaths", value="deaths"),
@@ -1011,7 +1034,7 @@ class Stats(commands.Cog):
         server_id="Select a server by name to check stats for"
     )
     @app_commands.autocomplete(server_id=server_id_autocomplete)
-    @premium_tier_required(1)  # Stats require premium tier 1+
+    @premium_tier_required(feature_name="stats")  # Stats require premium tier 1+
     async def weapon_categories(self, ctx, server_id: str):
         """View statistics by weapon category"""
 
@@ -1030,40 +1053,47 @@ class Stats(commands.Cog):
                 guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
                 if guild_data is None:
                     # Try with integer ID
-                    # Try string conversion of guild ID first
                     guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
-                        # Try with integer ID
+                
                 if guild_data is not None:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
+                    guild = guild_model
             except Exception as e:
                 logger.warning(f"Error getting guild model: {e}")
-
-            # Get guild data
-            # Get guild data with enhanced lookup
-            guild_id = ctx.guild.id
-            
-            # Try string conversion of guild ID first
-            guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
-            if guild_data is None:
-                # Try with integer ID
-                guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
+                guild_model = None
+                guild = None
             
             if guild_data is None:
                 embed = await EmbedBuilder.create_error_embed(
                     "Error",
                     "This guild is not set up. Please use the setup commands first."
-                , guild=guild_model)
+                )
                 await ctx.send(embed=embed)
                 return
 
-            # Check if the is not None guild has access to stats feature
-            guild = Guild(self.bot.db, guild_data)
-            if guild is None or not guild.check_feature_access("stats"):
+            # Check if the guild has access to stats feature
+            # Force tier check to handle premium access properly
+            if guild is None:
+                embed = await EmbedBuilder.create_error_embed(
+                    "Error",
+                    "Guild configuration not found. Please use the setup commands first."
+                )
+                await ctx.send(embed=embed)
+                return
+                
+            # Check if premium tier is set correctly first
+            premium_tier = getattr(guild, 'premium_tier', None)
+            logger.info(f"PREMIUM TIER: {premium_tier}")
+            if premium_tier is not None and int(premium_tier) >= 4:
+                logger.info(f"Maximum tier detected: {premium_tier} - Bypassing feature check")
+                # Tier 4 bypasses all feature checks
+                pass
+            elif not guild.check_feature_access("stats"):
                 embed = await EmbedBuilder.create_error_embed(
                     "Premium Feature",
                     "Weapon category statistics is a premium feature. Please upgrade to access this feature."
-                , guild=guild_model)
+                )
                 await ctx.send(embed=embed)
                 return
 
@@ -1184,7 +1214,7 @@ class Stats(commands.Cog):
         server_id=server_id_autocomplete,
         weapon_name=weapon_name_autocomplete
     )
-    @premium_tier_required(1)  # Stats require premium tier 1+
+    @premium_tier_required(feature_name="stats")  # Stats require premium tier 1+
     async def weapon_stats(self, ctx, server_id: str, weapon_name: str):
         """View statistics for a specific weapon"""
 

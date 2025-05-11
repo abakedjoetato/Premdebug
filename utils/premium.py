@@ -31,17 +31,21 @@ PREMIUM_FEATURES = {
     
     # Tier 1 features (Survivor)
     "basic_stats": 1,
+    "stats": 1,  # Alias for basic_stats
     "leaderboards": 1,
     
     # Tier 2 features (Mercenary)
     "rivalries": 2,
     "bounties": 2,
+    "bounty_notifications": 2,  # Related to bounties feature
     "player_links": 2,
     "economy": 2,
     "advanced_analytics": 2,
     
     # Tier 3 features (Warlord)
     "factions": 3,
+    "events": 3,  # Custom server events feature
+    "connections": 3,  # External connections feature
     
     # Additional helpers
     "max_servers": 0,  # Base tier feature

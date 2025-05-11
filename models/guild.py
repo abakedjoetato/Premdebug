@@ -764,6 +764,11 @@ class Guild(BaseModel):
         except (ValueError, TypeError):
             logger.warning(f"Invalid premium_tier value: {self.premium_tier}, defaulting to 0")
             premium_tier = 0
+            
+        # CRITICAL FIX: Special handling for tier 4 (highest tier) - always grant access to all features
+        if premium_tier >= 4:
+            logger.info(f"Automatic access granted to '{feature_name}' for guild with tier {premium_tier} (highest tier)")
+            return True
         
         # Method 1: Check using direct PREMIUM_FEATURES mapping (most efficient)
         # This implements tier inheritance by checking if current tier >= required tier

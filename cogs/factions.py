@@ -156,7 +156,7 @@ class FactionsCog(commands.Cog):
         color="The faction color (hex code or color name)"
     )
     @app_commands.autocomplete(server_id=server_id_autocomplete)
-    @premium_tier_required(2)  # Factions require premium tier 2+
+    @premium_tier_required(feature_name="factions")  # Factions require premium tier 2+
     async def _faction_create(
         self,
         interaction: discord.Interaction,
@@ -284,7 +284,7 @@ class FactionsCog(commands.Cog):
         name="The faction name or tag"
     )
     @app_commands.autocomplete(server_id=server_id_autocomplete)
-    @premium_tier_required(2)  # Factions require premium tier 2+
+    @premium_tier_required(feature_name="factions")  # Factions require premium tier 2+
     async def _faction_info(
         self,
         interaction: discord.Interaction,
@@ -369,7 +369,7 @@ class FactionsCog(commands.Cog):
         server_id="The server ID (default: first available server)"
     )
     @app_commands.autocomplete(server_id=server_id_autocomplete)
-    @premium_tier_required(2)  # Factions require premium tier 2+
+    @premium_tier_required(feature_name="factions")  # Factions require premium tier 2+
     async def _faction_list(
         self,
         interaction: discord.Interaction,
@@ -414,7 +414,7 @@ class FactionsCog(commands.Cog):
         name="The faction name or tag"
     )
     @app_commands.autocomplete(server_id=server_id_autocomplete)
-    @premium_tier_required(2)  # Factions require premium tier 2+
+    @premium_tier_required(feature_name="factions")  # Factions require premium tier 2+
     async def _faction_join(
         self,
         interaction: discord.Interaction,
@@ -514,7 +514,7 @@ class FactionsCog(commands.Cog):
         server_id="The server ID (default: first available server)"
     )
     @app_commands.autocomplete(server_id=server_id_autocomplete)
-    @premium_tier_required(2)  # Factions require premium tier 2+
+    @premium_tier_required(feature_name="factions")  # Factions require premium tier 2+
     async def _faction_leave(
         self,
         interaction: discord.Interaction,
@@ -603,7 +603,7 @@ class FactionsCog(commands.Cog):
     )
     @app_commands.autocomplete(server_id=server_id_autocomplete)
     @app_commands.checks.has_permissions(manage_guild=True)
-    @premium_tier_required(2)  # Factions require premium tier 2+
+    @premium_tier_required(feature_name="factions")  # Factions require premium tier 2+
     async def _faction_add(
         self,
         interaction: discord.Interaction,
@@ -698,7 +698,7 @@ class FactionsCog(commands.Cog):
     )
     @app_commands.autocomplete(server_id=server_id_autocomplete)
     @app_commands.checks.has_permissions(manage_guild=True)
-    @premium_tier_required(2)  # Factions require premium tier 2+
+    @premium_tier_required(feature_name="factions")  # Factions require premium tier 2+
     async def _faction_remove(
         self,
         interaction: discord.Interaction,
@@ -802,7 +802,7 @@ class FactionsCog(commands.Cog):
         role="The role to promote to (member, officer, leader)"
     )
     @app_commands.autocomplete(server_id=server_id_autocomplete)
-    @premium_tier_required(2)  # Factions require premium tier 2+
+    @premium_tier_required(feature_name="factions")  # Factions require premium tier 2+
     async def _faction_promote(
         self,
         interaction: discord.Interaction,
@@ -952,7 +952,7 @@ class FactionsCog(commands.Cog):
         description="The new faction description",
         color="The new faction color (hex code or color name)"
     )
-    @premium_tier_required(2)  # Factions require premium tier 2+
+    @premium_tier_required(feature_name="factions")  # Factions require premium tier 2+
     async def _faction_edit(
         self,
         interaction: discord.Interaction,
@@ -1120,7 +1120,7 @@ class FactionsCog(commands.Cog):
         server_id="The server ID (default: first available server)",
         faction_name="The faction name or tag"
     )
-    @premium_tier_required(2)  # Factions require premium tier 2+
+    @premium_tier_required(feature_name="factions")  # Factions require premium tier 2+
     async def _faction_stats(
         self,
         interaction: discord.Interaction,
@@ -1205,7 +1205,7 @@ class FactionsCog(commands.Cog):
         server_id="The server ID (default: first available server)",
         faction_name="The faction name or tag"
     )
-    @premium_tier_required(2)  # Factions require premium tier 2+
+    @premium_tier_required(feature_name="factions")  # Factions require premium tier 2+
     async def _faction_delete(
         self,
         interaction: discord.Interaction,
@@ -1310,7 +1310,7 @@ class FactionsCog(commands.Cog):
         faction_name="The faction name or tag",
         require_approval="Whether the faction requires approval to join (true/false)"
     )
-    @premium_tier_required(2)  # Factions require premium tier 2+
+    @premium_tier_required(feature_name="factions")  # Factions require premium tier 2+
     async def _faction_set_require_approval(
         self,
         interaction: discord.Interaction,

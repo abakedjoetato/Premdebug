@@ -39,7 +39,7 @@ class Killfeed(commands.Cog):
     @killfeed.command(name="start", description="Start monitoring killfeed for a server")
     @app_commands.describe(server_id="Select a server by name to monitor")
     @app_commands.autocomplete(server_id=server_id_autocomplete)
-    @premium_tier_required(0)  # Killfeed available in free tier (0+)
+    @premium_tier_required(feature_name="killfeed")  # Killfeed available in free tier (0+)
     async def start(self, ctx, server_id: str):
         """Start the killfeed monitor for a server"""
         try:
@@ -154,7 +154,7 @@ class Killfeed(commands.Cog):
     @killfeed.command(name="stop", description="Stop monitoring killfeed for a server")
     @app_commands.describe(server_id="Select a server by name to stop monitoring")
     @app_commands.autocomplete(server_id=server_id_autocomplete)
-    @premium_tier_required(0)  # Killfeed available in free tier (0+)
+    @premium_tier_required(feature_name="killfeed")  # Killfeed available in free tier (0+)
     async def stop(self, ctx, server_id: str):
         """Stop the killfeed monitor for a server"""
 
@@ -215,7 +215,7 @@ class Killfeed(commands.Cog):
             await ctx.send(embed=embed)
 
     @killfeed.command(name="status", description="Check killfeed monitor status")
-    @premium_tier_required(0)  # Killfeed available in free tier (0+)
+    @premium_tier_required(feature_name="killfeed")  # Killfeed available in free tier (0+)
     async def status(self, ctx):
         """Check the status of killfeed monitors for this guild"""
 

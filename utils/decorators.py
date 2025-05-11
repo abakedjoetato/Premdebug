@@ -63,9 +63,9 @@ MAX_SLOW_COMMANDS = 10       # Number of slow commands to track
 SLOW_COMMAND_THRESHOLD = 1.0  # Command is considered slow if it takes more than 1 second
 
 
-def premium_tier_required(tier_level: int):
+def premium_tier_required(tier_level: int = None, feature_name: str = None):
     """
-    Decorator to check if the guild has the required premium tier level.
+    Decorator to check if the guild has the required premium tier level or feature access.
 
     This decorator implements tier inheritance, ensuring higher tiers 
     have access to all features from lower tiers.
@@ -73,11 +73,27 @@ def premium_tier_required(tier_level: int):
     This works on both traditional commands and application commands.
 
     Args:
-        tier_level: Minimum tier level required (0-4)
+        tier_level: Minimum tier level required (0-4), or None if using feature_name
+        feature_name: Name of the feature to check, or None if using tier_level
 
     Returns:
         Command decorator
     """
+    # Validate arguments - must provide either tier_level or feature_name
+    if tier_level is None and feature_name is None:
+        raise ValueError("Either tier_level or feature_name must be provided")
+        
+    # Import here to avoid circular imports
+    from utils.premium import PREMIUM_FEATURES
+    
+    # If feature_name is provided, get the corresponding tier level
+    if feature_name is not None:
+        if feature_name in PREMIUM_FEATURES:
+            tier_level = PREMIUM_FEATURES.get(feature_name, 1)  # Default to tier 1 if not found
+        else:
+            # If feature not found in mapping, use a safe default
+            tier_level = 1
+            logger.warning(f"Feature '{feature_name}' not found in PREMIUM_FEATURES mapping. Using tier {tier_level} as default.")
     def decorator(func):
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):

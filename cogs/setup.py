@@ -47,7 +47,7 @@ class Setup(commands.Cog):
         server_id="Unique ID for the server (letters, numbers, underscores only)"
     )
     @app_commands.guild_only()
-    @premium_tier_required(1)  # Connecting servers requires premium tier 1+
+    @premium_tier_required(feature_name="stats")  # Connecting servers requires premium tier 1+
     async def add_server(self, ctx, server_name: str, host: str, port: int, username: str, password: str, server_id: str):
         """Add a new server to track"""
         try:

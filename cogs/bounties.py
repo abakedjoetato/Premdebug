@@ -369,7 +369,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
         reward="Amount of currency to offer as a reward",
         reason="Reason for the bounty"
     )
-    @premium_tier_required(2)  # Bounties require premium tier 2+
+    @premium_tier_required(feature_name="bounties")  # Bounties require premium tier 2+
     async def place_bounty(self, interaction: discord.Interaction, 
                        server_id: str,
                        player_name: str,
@@ -552,7 +552,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
     @app_commands.describe(
         server_id="Server to view bounties for"
     )
-    @premium_tier_required(2)  # Bounties require premium tier 2+
+    @premium_tier_required(feature_name="bounties")  # Bounties require premium tier 2+
     async def active_bounties(self, interaction: discord.Interaction, server_id: str):
         """View active bounties
 
@@ -631,7 +631,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
         app_commands.Choice(name="Bounties I've Placed", value="placed"),
         app_commands.Choice(name="Bounties I've Claimed", value="claimed")
     ])
-    @premium_tier_required(2)  # Bounties require premium tier 2+
+    @premium_tier_required(feature_name="bounties")  # Bounties require premium tier 2+
     async def my_bounties(self, interaction: discord.Interaction, 
                       server_id: str,
                       view_type: str = "placed"):
@@ -767,7 +767,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
         app_commands.Choice(name="Bounty Announcement Channel", value="bounty_channel")
     ])
     @has_admin_permission()
-    @premium_tier_required(2)  # Bounty settings require premium tier 2+
+    @premium_tier_required(feature_name="bounties")  # Bounty settings require premium tier 2+
     async def bounty_settings(self, interaction: discord.Interaction,
                           setting: str,
                           value: Optional[str] = None,

@@ -3173,7 +3173,7 @@ class CSVProcessorCog(commands.Cog):
         description="Manually process CSV files from the game server"
     )
     @admin_permission_decorator()
-    @premium_tier_required(1)  # Require Survivor tier for CSV processing
+    @premium_tier_required(feature_name="stats")  # Require Survivor tier for CSV processing
     @app_commands.autocomplete(server_id=server_id_autocomplete)
     async def process_csv_command(
         self,
@@ -3299,7 +3299,7 @@ class CSVProcessorCog(commands.Cog):
         description="Clear the CSV parser cache"
     )
     @admin_permission_decorator()
-    @premium_tier_required(1)  # Require Survivor tier for CSV cache management
+    @premium_tier_required(feature_name="stats")  # Require Survivor tier for CSV cache management
     async def clear_csv_cache_command(self, interaction: discord.Interaction):
         """Clear the CSV parser cache
 
@@ -3321,7 +3321,7 @@ class CSVProcessorCog(commands.Cog):
         description="Process historical CSV data going back further than normal processing"
     )
     @admin_permission_decorator()
-    @premium_tier_required(1)  # Require Survivor tier
+    @premium_tier_required(feature_name="stats")  # Require Survivor tier
     @app_commands.autocomplete(server_id=server_id_autocomplete)
     async def historical_parse_command(
         self,
@@ -3498,7 +3498,7 @@ class CSVProcessorCog(commands.Cog):
         description="Reset and rebuild all statistics for a server from CSV files"
     )
     @admin_permission_decorator()
-    @premium_tier_required(2)  # Require higher tier for this powerful command
+    @premium_tier_required(feature_name="rivalries")  # Require higher tier for this powerful command
     async def reset_stats_command(self, interaction: discord.Interaction, days: int = 60):
         """Reset and rebuild all player statistics for a server from CSV files
         
@@ -3599,7 +3599,7 @@ class CSVProcessorCog(commands.Cog):
         description="Show CSV processor status"
     )
     @admin_permission_decorator()
-    @premium_tier_required(1)  # Require Survivor tier for CSV status
+    @premium_tier_required(feature_name="stats")  # Require Survivor tier for CSV status
     async def csv_status_command(self, interaction: discord.Interaction):
         """Show CSV processor status
 

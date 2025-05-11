@@ -411,7 +411,7 @@ class Premium(commands.Cog):
         app_commands.Choice(name="Toxic", value="toxic"),
         app_commands.Choice(name="Ghost", value="ghost")
     ])
-    @premium_tier_required(3)  # Custom embeds require Warlord tier (3+)
+    @premium_tier_required(feature_name="factions")  # Custom embeds require Warlord tier (3+)
     async def set_theme(self, ctx, theme: str):
         """Set the theme for embed displays (Warlord+ only)"""
         try:

@@ -41,7 +41,7 @@ class PlayerLinksCog(commands.Cog):
         server_id="The server ID (default: first available server)"
     )
     @app_commands.autocomplete(server_id=server_id_autocomplete)
-    @premium_tier_required(0)  # Available to all users (Tier 0+)
+    @premium_tier_required(feature_name="player_links")  # Available to all users (Tier 0+)
     async def link_player(
         self,
         interaction: discord.Interaction,
@@ -107,7 +107,7 @@ class PlayerLinksCog(commands.Cog):
         server_id="The server ID (default: first available server)"
     )
     @app_commands.autocomplete(server_id=server_id_autocomplete)
-    @premium_tier_required(0)  # Available to all users (Tier 0+)
+    @premium_tier_required(feature_name="player_links")  # Available to all users (Tier 0+)
     async def unlink_player(
         self,
         interaction: discord.Interaction,
@@ -180,7 +180,7 @@ class PlayerLinksCog(commands.Cog):
         server_id="The server ID (default: first available server)"
     )
     @app_commands.autocomplete(server_id=server_id_autocomplete)
-    @premium_tier_required(0)  # Available to all users (Tier 0+)
+    @premium_tier_required(feature_name="player_links")  # Available to all users (Tier 0+)
     async def view_linked_players(
         self,
         interaction: discord.Interaction,
