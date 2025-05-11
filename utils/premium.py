@@ -141,35 +141,56 @@ async def has_feature_access(guild_model, feature_name: str) -> bool:
         logger.warning("[PREMIUM_DEBUG] Cannot check feature access: guild_model is None")
         return False
 
-    # CRITICAL FIX: Get and log the premium tier with better type inspection
+    # CRITICAL FIX: Get and log the premium tier with better type inspection and standardization
+    guild_tier = 0  # Default tier
     premium_tier_value = None
     try:
+        # First try to get premium_tier directly
         if hasattr(guild_model, 'premium_tier'):
             premium_tier_value = guild_model.premium_tier
             logger.info(f"[PREMIUM_DEBUG] Object guild model has premium_tier: {premium_tier_value}, type: {type(premium_tier_value).__name__}")
         elif isinstance(guild_model, dict) and 'premium_tier' in guild_model:
             premium_tier_value = guild_model['premium_tier']
             logger.info(f"[PREMIUM_DEBUG] Dictionary guild model has premium_tier: {premium_tier_value}, type: {type(premium_tier_value).__name__}")
+
+        # Standardize premium_tier to integer value
+        if premium_tier_value is not None:
+            if isinstance(premium_tier_value, int):
+                guild_tier = premium_tier_value
+            elif isinstance(premium_tier_value, str) and premium_tier_value.strip().isdigit():
+                guild_tier = int(premium_tier_value.strip())
+            else:
+                try:
+                    guild_tier = int(premium_tier_value)
+                except (ValueError, TypeError):
+                    guild_tier = 0
+                    logger.warning(f"[PREMIUM_DEBUG] Failed to convert premium_tier {premium_tier_value} to int, defaulting to 0")
+        
+        # Ensure tier is in valid range
+        guild_tier = max(0, min(5, guild_tier))
+        logger.info(f"[PREMIUM_DEBUG] Guild {guild_id} standardized tier: {guild_tier}")
+        
     except Exception as e:
         logger.error(f"[PREMIUM_DEBUG] Error inspecting premium_tier: {e}")
+        guild_tier = 0
 
-    # Special case for leaderboards - this should be available at tier 1+
-    if feature_name in ['leaderboards', 'stats', 'basic_stats'] and premium_tier_value is not None:
-        try:
-            if int(premium_tier_value) >= 1:
-                logger.info(f"[PREMIUM_DEBUG] Direct access granted for essential feature '{feature_name}' at tier {premium_tier_value}")
-                return True
-        except (ValueError, TypeError) as e:
-            logger.warning(f"[PREMIUM_DEBUG] Error in fast-path tier check: {e}")
-            # Fall through to standard checks
+    # Special fast-path for essential features (leaderboards, stats, basic_stats)
+    if feature_name in ['leaderboards', 'stats', 'basic_stats'] and guild_tier >= 1:
+        logger.info(f"[PREMIUM_DEBUG] Fast-path access granted for essential feature '{feature_name}' at tier {guild_tier}")
+        return True
+    
+    # Auto-grant for highest tiers
+    if guild_tier >= 4:  # Tiers 4+ (Overseer) get access to all features
+        logger.info(f"[PREMIUM_DEBUG] Auto-granting access to '{feature_name}' for highest tier {guild_tier}")
+        return True
 
-    logger.info(f"[PREMIUM_DEBUG] Checking feature '{feature_name}' access for guild {guild_id}")
+    logger.info(f"[PREMIUM_DEBUG] Checking feature '{feature_name}' access for guild {guild_id} with tier {guild_tier}")
 
     # Emergency direct DB verification for the most accurate premium tier
     db_premium_tier = None
     db = None
     
-    # CRITICAL FIX: Get database connection through multiple approaches
+    # Try to get a database connection if needed for verification
     try:
         if hasattr(guild_model, 'db') and guild_model.db is not None:
             db = guild_model.db
@@ -185,25 +206,6 @@ async def has_feature_access(guild_model, feature_name: str) -> bool:
                     logger.info(f"[PREMIUM_DEBUG] Got database connection from get_db()")
             except Exception as db_err:
                 logger.error(f"[PREMIUM_DEBUG] Error getting database: {db_err}")
-        
-        # Now that we have a DB connection, try to get guild_id more precisely
-        if guild_id == 'unknown' and db is not None:
-            if hasattr(guild_model, '_id'):
-                try:
-                    guild_doc = await db.guilds.find_one({"_id": guild_model._id}, {"guild_id": 1})
-                    if guild_doc and 'guild_id' in guild_doc:
-                        guild_id = guild_doc['guild_id']
-                        logger.info(f"[PREMIUM_DEBUG] Found guild_id {guild_id} from _id in database")
-                except Exception:
-                    pass
-            elif isinstance(guild_model, dict) and '_id' in guild_model:
-                try:
-                    guild_doc = await db.guilds.find_one({"_id": guild_model['_id']}, {"guild_id": 1})
-                    if guild_doc and 'guild_id' in guild_doc:
-                        guild_id = guild_doc['guild_id']
-                        logger.info(f"[PREMIUM_DEBUG] Found guild_id {guild_id} from _id in dictionary")
-                except Exception:
-                    pass
         
         # Now query the database for premium tier if we have a valid guild_id and DB
         if db is not None and guild_id != 'unknown':
@@ -235,186 +237,49 @@ async def has_feature_access(guild_model, feature_name: str) -> bool:
                     if guild_doc is not None and "premium_tier" in guild_doc:
                         db_tier_value = guild_doc.get("premium_tier")
                         if db_tier_value is not None:
-                            db_premium_tier = int(db_tier_value)
-                            logger.info(f"[PREMIUM_DEBUG] Alternative DB verification for guild {guild_id}: premium_tier={db_premium_tier}")
+                            try:
+                                db_premium_tier = int(db_tier_value)
+                                logger.info(f"[PREMIUM_DEBUG] Alternative DB verification for guild {guild_id}: premium_tier={db_premium_tier}")
+                            except (ValueError, TypeError):
+                                logger.error(f"[PREMIUM_DEBUG] Failed to convert alternative DB tier to int: {db_tier_value}")
                 except Exception as alt_error:
                     logger.error(f"[PREMIUM_DEBUG] Alternative query error: {alt_error}")
     except Exception as e:
         logger.error(f"[PREMIUM_DEBUG] Error in direct DB verification: {e}")
 
-    # Standardized tier determination using all available sources
-    premium_tier = 0  # Default to free tier
-    try:
-        # 1. First try to get tier from guild_model with robust error handling
-        model_premium_tier = 0
-        try:
-            if hasattr(guild_model, 'premium_tier'):
-                premium_tier_value = guild_model.premium_tier
-                if premium_tier_value is None:
-                    model_premium_tier = 0
-                elif isinstance(premium_tier_value, int):
-                    model_premium_tier = premium_tier_value
-                elif isinstance(premium_tier_value, str) and premium_tier_value.strip().isdigit():
-                    model_premium_tier = int(premium_tier_value.strip())
-                else:
-                    model_premium_tier = int(premium_tier_value)
-            elif isinstance(guild_model, dict) and 'premium_tier' in guild_model:
-                # CRITICAL FIX: Better dictionary handling
-                premium_tier_value = guild_model['premium_tier']
-                if premium_tier_value is None:
-                    model_premium_tier = 0
-                elif isinstance(premium_tier_value, int):
-                    model_premium_tier = premium_tier_value
-                elif isinstance(premium_tier_value, str) and premium_tier_value.strip().isdigit():
-                    model_premium_tier = int(premium_tier_value.strip())
-                else:
-                    model_premium_tier = int(premium_tier_value)
-        except (ValueError, TypeError, AttributeError) as e:
-            logger.warning(f"[PREMIUM_DEBUG] Error getting model premium_tier: {e}")
-
-        # 2. Compare with DB verified tier (if available) and use the higher value
-        if db_premium_tier is not None and db_premium_tier > model_premium_tier:
-            premium_tier = db_premium_tier
-            logger.info(f"[PREMIUM_DEBUG] Using DB verified tier {premium_tier} instead of model tier {model_premium_tier}")
-        else:
-            premium_tier = model_premium_tier
-
-        # 3. Ensure premium_tier is within valid range (0-5)
-        premium_tier = max(0, min(5, premium_tier))
-        logger.info(f"[PREMIUM_DEBUG] Final premium tier determination: {premium_tier}")
-
-        # 4. Auto-grant access for highest tier (4-5)
-        if premium_tier >= 4:
-            logger.info(f"[PREMIUM_DEBUG] Auto-granting access to '{feature_name}' for highest tier {premium_tier}")
-            return True
-
-        # 5. Special fast-path for essential features
-        if feature_name in ['leaderboards', 'stats', 'basic_stats'] and premium_tier >= 1:
-            logger.info(f"[PREMIUM_DEBUG] Fast-path access granted for essential feature '{feature_name}' at tier {premium_tier}")
-            return True
-
-        # 6. Standard feature check using PREMIUM_FEATURES mapping
-        if feature_name in PREMIUM_FEATURES:
-            min_tier_required = PREMIUM_FEATURES.get(feature_name, 999)
-            has_access = premium_tier >= min_tier_required
-            logger.info(f"[PREMIUM_DEBUG] Direct tier check for '{feature_name}': min tier required={min_tier_required}, guild tier={premium_tier}, access granted: {has_access}")
-            if has_access:
-                return True
-    except (ValueError, TypeError, AttributeError) as e:
-        logger.warning(f"[PREMIUM_DEBUG] Error in direct tier check: {e}")
-
-    # Method 2: Use the comprehensive check_feature_access method in Guild model
-        # This handles tier inheritance properly
-    try:
-        # CRITICAL FIX: Update the model's premium_tier if we have a verified higher value
-        if db_premium_tier is not None:
+    # If DB lookup found a higher tier, use it
+    if db_premium_tier is not None:
+        if db_premium_tier > guild_tier:
+            logger.info(f"[PREMIUM_DEBUG] Using higher DB tier {db_premium_tier} instead of model tier {guild_tier}")
+            guild_tier = db_premium_tier
+            
+            # Update the model's tier if possible to avoid future lookups
             try:
                 if hasattr(guild_model, 'premium_tier'):
-                    model_tier = guild_model.premium_tier if guild_model.premium_tier is not None else 0
-                    try:
-                        # Ensure it's an integer for comparison
-                        model_tier = int(model_tier)
-                    except (ValueError, TypeError):
-                        model_tier = 0
-
-                    if model_tier < db_premium_tier:
-                        # Only update if DB tier is higher
-                        logger.info(f"[PREMIUM_DEBUG] Updating guild model premium_tier from {model_tier} to {db_premium_tier}")
-                        guild_model.premium_tier = db_premium_tier
-                elif isinstance(guild_model, dict) and 'premium_tier' in guild_model:
-                    # Handle case where guild_model is a dictionary
-                    dict_tier = guild_model['premium_tier'] if guild_model['premium_tier'] is not None else 0
-                    try:
-                        dict_tier = int(dict_tier)
-                    except (ValueError, TypeError):
-                        dict_tier = 0
-
-                    if dict_tier < db_premium_tier:
-                        guild_model['premium_tier'] = db_premium_tier
-                        logger.info(f"[PREMIUM_DEBUG] Updating dictionary guild premium_tier from {dict_tier} to {db_premium_tier}")
+                    guild_model.premium_tier = guild_tier
+                elif isinstance(guild_model, dict):
+                    guild_model['premium_tier'] = guild_tier
             except Exception as update_err:
-                logger.error(f"[PREMIUM_DEBUG] Error updating premium_tier: {update_err}")
-
-        # Handle calling check_feature_access for both object and dictionary
-        if isinstance(guild_model, dict):
-            # CRITICAL FIX: For dictionaries, use the improved logic
-            try:
-                # First, ensure we have the most accurate tier value
-                dict_tier = 0
-                
-                # Try to read from the dict with better error handling
-                premium_tier_value = guild_model.get('premium_tier')
-                if premium_tier_value is not None:
-                    try:
-                        if isinstance(premium_tier_value, int):
-                            dict_tier = premium_tier_value
-                        elif isinstance(premium_tier_value, str) and premium_tier_value.strip().isdigit():
-                            dict_tier = int(premium_tier_value.strip())
-                        else:
-                            dict_tier = int(premium_tier_value)
-                    except (ValueError, TypeError):
-                        dict_tier = 0
-                
-                # Use the DB tier if it's higher
-                if db_premium_tier is not None and db_premium_tier > dict_tier:
-                    dict_tier = db_premium_tier
-                    # Update the dictionary with the new value
-                    guild_model['premium_tier'] = dict_tier
-                
-                logger.info(f"[PREMIUM_DEBUG] Using premium_tier {dict_tier} from dictionary guild model")
-
-                # Apply tier inheritance logic directly
-                from utils.premium import PREMIUM_FEATURES
-                if dict_tier >= 4:  # Highest tier
-                    logger.info(f"[PREMIUM_DEBUG] Dictionary guild has tier {dict_tier} >= 4, auto-granting access")
-                    return True
-                elif feature_name in ['stats', 'leaderboards', 'basic_stats'] and dict_tier >= 1:
-                    logger.info(f"[PREMIUM_DEBUG] Fast-path access for essential feature '{feature_name}' with dict tier {dict_tier}")
-                    return True
-                elif feature_name in PREMIUM_FEATURES:
-                    min_tier_required = PREMIUM_FEATURES.get(feature_name, 999)
-                    has_access = dict_tier >= min_tier_required
-                    logger.info(f"[PREMIUM_DEBUG] Dictionary check for feature '{feature_name}': min tier={min_tier_required}, guild tier={dict_tier}, access={has_access}")
-                    return has_access
-                return False
-            except Exception as dict_err:
-                logger.error(f"[PREMIUM_DEBUG] Error checking dictionary guild tier: {dict_err}")
-                
-                # CRITICAL FIX: Fallback direct feature check if dictionary method fails
-                if db_premium_tier is not None and feature_name in PREMIUM_FEATURES:
-                    min_tier_required = PREMIUM_FEATURES.get(feature_name, 999)
-                    has_access = db_premium_tier >= min_tier_required
-                    logger.info(f"[PREMIUM_DEBUG] Dictionary fallback check: tier={db_premium_tier}, required={min_tier_required}, access={has_access}")
-                    return has_access
-
-        # For Guild objects, use the standard method
-        try:
-            has_access = await guild_model.check_feature_access(feature_name)
-            logger.info(f"[PREMIUM_DEBUG] Feature inheritance check for '{feature_name}': access granted: {has_access}")
-            return has_access
-        except Exception as check_err:
-            logger.error(f"[PREMIUM_DEBUG] Error in guild_model.check_feature_access: {check_err}")
-            
-            # If check_feature_access failed, try a fallback approach
-            if db_premium_tier is not None and feature_name in PREMIUM_FEATURES:
-                min_tier_required = PREMIUM_FEATURES.get(feature_name, 999)
-                has_access = db_premium_tier >= min_tier_required
-                logger.info(f"[PREMIUM_DEBUG] Object fallback check: tier={db_premium_tier}, required={min_tier_required}, access={has_access}")
-                return has_access
-    except Exception as e:
-        logger.error(f"[PREMIUM_DEBUG] Error in guild_model.check_feature_access: {e}")
-
-        # CRITICAL FIX: Fallback direct feature check if model method fails
-        try:
-            if db_premium_tier is not None and feature_name in PREMIUM_FEATURES:
-                min_tier_required = PREMIUM_FEATURES.get(feature_name, 999)
-                has_access = db_premium_tier >= min_tier_required
-                logger.info(f"[PREMIUM_DEBUG] Fallback direct check after model error: tier={db_premium_tier}, required={min_tier_required}, access={has_access}")
-                return has_access
-        except Exception as fallback_error:
-            logger.error(f"[PREMIUM_DEBUG] Error in fallback feature check: {fallback_error}")
-
+                logger.error(f"[PREMIUM_DEBUG] Error updating tier on model: {update_err}")
+    
+    # Final tier check after all validations
+    if guild_tier >= 4:  # Highest tier (4+) gets access to all features
+        logger.info(f"[PREMIUM_DEBUG] Auto-granting access to '{feature_name}' for highest tier {guild_tier}")
+        return True
+        
+    # Check for specific feature access
+    if feature_name in PREMIUM_FEATURES:
+        min_tier_required = PREMIUM_FEATURES.get(feature_name, 999)
+        has_access = guild_tier >= min_tier_required
+        logger.info(f"[PREMIUM_DEBUG] Feature '{feature_name}' requires tier {min_tier_required}, guild has tier {guild_tier}, access: {has_access}")
+        return has_access
+    else:
+        logger.warning(f"[PREMIUM_DEBUG] Feature '{feature_name}' not found in PREMIUM_FEATURES, access denied")
         return False
+
+    # The feature access check has already been performed in the code above
+    # Return False as fallback if we reach this point
+    return False
 
 
 async def validate_premium_feature(guild_model, feature_name: str) -> Tuple[bool, Optional[str]]:

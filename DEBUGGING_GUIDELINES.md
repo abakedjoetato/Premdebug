@@ -1,46 +1,95 @@
 
-# Debugging Guidelines
+# Premium Tier Debugging Guidelines
 
-## Methodical Approach to Fixing Issues
+## Introduction
 
-1. **Identify the root cause**
-   - Carefully read error messages and stack traces
-   - Identify the primary issue before attempting fixes
-   - Look for syntax errors, which often cause cascading failures
+This document provides guidance for diagnosing and fixing premium tier verification issues in the Discord bot. Premium tier verification is critical for ensuring proper access to features and must work consistently across all code paths.
 
-2. **Plan your changes**
-   - Document what needs to be changed and why
-   - Consider potential ripple effects of any changes
-   - Plan verification steps before implementing
+## Known Issue Patterns
 
-3. **Test in isolation**
-   - Create validation scripts to test specific components
-   - Verify syntax and basic functionality before full testing
-   - Use small test cases that target the specific issue
+1. **Type Mismatch**: The `premium_tier` might be stored as different types (int, str, None) in different contexts.
+2. **Multiple Access Paths**: There are several ways to check premium access (`check_feature_access`, `has_feature_access`, etc.) that might give inconsistent results.
+3. **Database vs. Model Inconsistency**: The model's premium tier might not match the database value.
+4. **Dictionary vs. Object Access**: The system handles both dictionary and object representations of Guild models differently.
 
-4. **Implement changes incrementally**
-   - Make one change at a time
-   - Verify each change before moving to the next
-   - Avoid making multiple unrelated changes simultaneously
+## Diagnostic Steps
 
-5. **Document what was fixed**
-   - Note the root cause and solution
-   - Document any patterns that might cause similar issues
-   - Update code with clear comments where appropriate
+1. **Verify Database State**:
+   ```python
+   # Direct DB check
+   guild_doc = await db.guilds.find_one({"guild_id": str(guild_id)})
+   db_tier = guild_doc.get("premium_tier") if guild_doc else None
+   print(f"DB tier: {db_tier}, type: {type(db_tier).__name__}")
+   ```
 
-## Common Issues
+2. **Check Guild Model Loading**:
+   ```python
+   # Guild model check
+   guild_model = await Guild.get_by_guild_id(db, guild_id)
+   model_tier = getattr(guild_model, 'premium_tier', None)
+   print(f"Model tier: {model_tier}, type: {type(model_tier).__name__}")
+   ```
 
-### String Literals
-- Ensure all string literals are properly terminated
-- Check for balanced quotes and triple-quotes
-- Be careful with f-strings that contain multiple lines
+3. **Test Premium Check Functions**:
+   ```python
+   # Test various premium check methods
+   from utils.premium import has_feature_access, validate_premium_feature
+   
+   # Method 1: has_feature_access utility
+   has_access = await has_feature_access(guild_model, "leaderboards")
+   print(f"has_feature_access: {has_access}")
+   
+   # Method 2: Guild model method
+   guild_access = await guild_model.check_feature_access("leaderboards")
+   print(f"guild.check_feature_access: {guild_access}")
+   
+   # Method 3: validate_premium_feature utility
+   validation_access, _ = await validate_premium_feature(guild_model, "leaderboards")
+   print(f"validate_premium_feature: {validation_access}")
+   ```
 
-### Indentation
-- Python is sensitive to indentation
-- Verify consistent indentation after code changes
-- Use syntax validation tools to catch indentation errors
+4. **Run Verification Script**:
+   ```bash
+   python verify_premium_fixes.py <guild_id>
+   ```
 
-### Asynchronous Code
-- Ensure `await` is used with all coroutines
-- Check that methods expected to be awaited are defined as `async`
-- Be careful with embedding async calls in synchronous contexts
+## Common Fixes
+
+1. **Ensure Integer Storage**:
+   - Always store `premium_tier` as an integer in the database
+   - Convert values to integers when loading from the database
+
+2. **Use Consistent Access Methods**:
+   - Use `has_feature_access` from `utils.premium` as the standard method
+   - Make the Guild model's `check_feature_access` method call `has_feature_access`
+
+3. **Update Model from DB**:
+   - If there's a mismatch, update the model's tier from the database
+   - Keep the model synchronized with database changes
+
+4. **Proper Type Handling**:
+   - Always use proper type checking with `isinstance()`
+   - Implement robust type conversion with error handling
+
+## Verification
+
+After making changes, verify that:
+
+1. All premium check methods give the same result
+2. The results match the expected access based on the guild's tier
+3. Changes to premium tier in database are reflected in all methods
+4. Different feature access requirements are correctly enforced
+
+Run the full verification script to validate all premium systems:
+
+```bash
+python run_premium_verification.py <guild_id>
+```
+
+## Best Practices
+
+1. **Single Source of Truth**: Use `has_feature_access` as the single point for premium validation
+2. **Standard Integer Type**: Always keep premium_tier as an integer
+3. **Robust Error Handling**: Handle nulls, type conversion errors, and invalid inputs
+4. **Logging**: Use detailed logging with the `[PREMIUM_DEBUG]` prefix for traceability
+5. **Validation Over Reference**: Validate values before using them instead of assuming types
