@@ -2848,9 +2848,12 @@ class CSVProcessorCog(commands.Cog):
                 logger.info(f"Direct config historical parse complete for server {server_id}: "
                           f"processed {files_processed} files with {events_processed} events")
                 # Track server activity for adaptive processing
-            recommended_interval = await self._check_server_activity(server_id, events_processed)
+                try:
+                    await self._check_server_activity(server_id, events_processed)
+                except Exception as e:
+                    logger.warning(f"Error tracking server activity: {e}")
             
-            return files_processed, events_processed
+                return files_processed, events_processed
             except Exception as e:
                 logger.error(f"Error in direct config historical parse for server {server_id}: {e}")
                 return 0, 0
@@ -2975,9 +2978,12 @@ class CSVProcessorCog(commands.Cog):
                         logger.info(f"Direct resolution historical parse complete for server {resolved_server_id}: "
                                    f"processed {files_processed} files with {events_processed} events")
                         # Track server activity for adaptive processing
-            recommended_interval = await self._check_server_activity(server_id, events_processed)
-            
-            return files_processed, events_processed
+                        try:
+                            await self._check_server_activity(server_id, events_processed)
+                        except Exception as e:
+                            logger.warning(f"Error tracking server activity: {e}")
+                
+                        return files_processed, events_processed
                     except Exception as e:
                         logger.error(f"Error in direct resolution historical parse for server {resolved_server_id}: {e}")
                         return 0, 0
@@ -3107,9 +3113,12 @@ class CSVProcessorCog(commands.Cog):
                 logger.info(f"Traditional historical parse complete for server {server_id}: "
                            f"processed {files_processed} files with {events_processed} events")
                 # Track server activity for adaptive processing
-            recommended_interval = await self._check_server_activity(server_id, events_processed)
+                try:
+                    await self._check_server_activity(server_id, events_processed)
+                except Exception as e:
+                    logger.warning(f"Error tracking server activity: {e}")
             
-            return files_processed, events_processed
+                return files_processed, events_processed
             except Exception as e:
                 logger.error(f"Error in traditional historical parse for server {server_id}: {e}")
                 return 0, 0
