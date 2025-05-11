@@ -118,6 +118,11 @@ async def has_feature_access(guild_model, feature_name: str) -> bool:
     """
     # Add detailed diagnostic information
     guild_id = getattr(guild_model, 'guild_id', 'unknown')
+    
+    # Validate inputs
+    if feature_name is None or not isinstance(feature_name, str) or not feature_name.strip():
+        logger.warning(f"[PREMIUM_DEBUG] Invalid feature name: {feature_name!r}")
+        return False
 
     # Quick returns for common cases
     if guild_model is None:
@@ -269,19 +274,25 @@ async def validate_premium_feature(guild_model, feature_name: str) -> Tuple[bool
     Returns:
         Tuple[bool, Optional[str]]: (has_access, error_message)
     """
+    # Validate inputs
+    if feature_name is None or not isinstance(feature_name, str) or not feature_name.strip():
+        logger.warning(f"[PREMIUM_DEBUG] Invalid feature name in validate_premium_feature: {feature_name!r}")
+        return False, "Invalid feature requested. Please contact an administrator."
+        
     # Enhanced error handling for None guild_model
     if guild_model is None:
-        logger.warning("validate_premium_feature called with None guild_model")
+        logger.warning(f"[PREMIUM_DEBUG] validate_premium_feature called with None guild_model for feature: {feature_name}")
         return False, "Server not registered with the bot. Please run `/setup` first."
 
     # Check feature access with early return optimization using the improved has_feature_access method
     # which now implements proper tier inheritance
     try:
+        # First try the cached path - for performance and consistency
         if await has_feature_access(guild_model, feature_name):
-            logger.debug(f"Feature access GRANTED: {feature_name} for guild with tier {getattr(guild_model, 'premium_tier', 0)}")
+            logger.info(f"[PREMIUM_DEBUG] Feature access GRANTED: {feature_name} for guild {getattr(guild_model, 'guild_id', 'unknown')} with tier {getattr(guild_model, 'premium_tier', 0)}")
             return True, None
     except Exception as e:
-        logger.error(f"Error in has_feature_access: {e}")
+        logger.error(f"[PREMIUM_DEBUG] Error in has_feature_access: {e}")
         # Continue with best-effort processing
 
     # If has_feature_access failed, let's do our own tier inheritance check
@@ -1170,4 +1181,5 @@ async def check_tier_access(db, guild_id: Union[str, int, None], required_tier: 
         f"This feature requires the **{required_tier_name}** tier or higher.\n"
         f"Your server is currently on the **{current_tier_name}** tier.\n\n"
         f"Use `/premium info` to learn more about premium features."
+    )` to learn more about premium features."
     )

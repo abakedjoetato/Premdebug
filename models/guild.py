@@ -458,8 +458,16 @@ class Guild(BaseModel):
         # Import PREMIUM_FEATURES here to avoid circular imports
         from utils.premium import PREMIUM_FEATURES
         
+        # Input validation
+        if feature_name is None or not isinstance(feature_name, str) or not feature_name.strip():
+            logger.warning(f"[PREMIUM_DEBUG] Invalid feature name: {feature_name!r}")
+            return False
+            
+        # Check for guild_id to provide better logging context
+        guild_id = getattr(self, 'guild_id', 'unknown')
+            
         # Log for debugging premium access issues
-        logger.info(f"[PREMIUM_DEBUG] Checking feature '{feature_name}' access for guild {self.guild_id}")
+        logger.info(f"[PREMIUM_DEBUG] Checking feature '{feature_name}' access for guild {guild_id}")
         
         # Default to tier 0 if premium_tier is None or invalid
         try:
@@ -468,20 +476,25 @@ class Guild(BaseModel):
                 if isinstance(self.premium_tier, int):
                     guild_tier = self.premium_tier
                 else:
-                    # Convert to int if possible
+                    # Convert to int if possible and cache the converted value
                     guild_tier = int(self.premium_tier)
+                    # Update the attribute to an integer to avoid repeated conversions
+                    self.premium_tier = guild_tier
+                    logger.info(f"[PREMIUM_DEBUG] Converted premium_tier from {type(self.premium_tier).__name__} to int: {guild_tier}")
             else:
                 guild_tier = 0
         except (ValueError, TypeError):
-            logger.warning(f"Invalid premium_tier value: {getattr(self, 'premium_tier', None)}, defaulting to 0")
+            logger.warning(f"[PREMIUM_DEBUG] Invalid premium_tier value: {getattr(self, 'premium_tier', None)}, defaulting to 0")
             guild_tier = 0
+            # Update the attribute with the default value
+            self.premium_tier = 0
             
         # Ensure tier is within valid range
         guild_tier = max(0, min(5, guild_tier))
         
         # Tier 4+ (Overseer) has access to all features
         if guild_tier >= 4:
-            logger.info(f"[PREMIUM_DEBUG] Guild {self.guild_id} has tier {guild_tier} >= 4, auto-granting access to all features")
+            logger.info(f"[PREMIUM_DEBUG] Guild {guild_id} has tier {guild_tier} >= 4, auto-granting access to all features")
             return True
             
         # Special fast-path for essential features available at tier 1+
