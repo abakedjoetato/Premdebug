@@ -680,6 +680,22 @@ class Setup(commands.Cog):
                                         logger.info(f"Removed {result.deleted_count} {collection_name} records")
                                 except Exception as coll_err:
                                     logger.error(f"Error cleaning up {collection_name}: {coll_err}")
+                            
+                            # Clean up CSV processor state
+                            try:
+                                # First clean from database
+                                state_result = await self.bot.db.csv_processor_state.delete_one({"server_id": std_server_id})
+                                logger.info(f"Removed CSV processor state for server {std_server_id} from database ({state_result.deleted_count} documents)")
+                                
+                                # Then try to use the CSV processor cog method if it's loaded
+                                csv_processor = self.bot.get_cog("CSVProcessorCog")
+                                if csv_processor and hasattr(csv_processor, "clear_server_state"):
+                                    success = await csv_processor.clear_server_state(std_server_id)
+                                    logger.info(f"CSV processor state cleanup result: {success}")
+                                else:
+                                    logger.warning(f"CSV processor cog not found or missing clear_server_state method")
+                            except Exception as csv_err:
+                                logger.error(f"Error cleaning up CSV processor state: {csv_err}")
                                     
                         except Exception as deletion_err:
                             logger.error(f"Error in backup deletion: {deletion_err}")

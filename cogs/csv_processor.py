@@ -96,8 +96,162 @@ class CSVProcessorCog(commands.Cog):
         self.found_map_files = False
         self.files_to_process = []
 
+        # BUGFIX: Load persisted state from database before starting task
+        # Create a task to load state asynchronously rather than blocking init
+        self.load_state_task = asyncio.create_task(self._load_state())
         # Start background task
         self.process_csv_files_task.start()
+        
+    async def _load_state(self):
+        """Load persisted CSV processing state from database"""
+        try:
+            # Wait for the bot to be ready to ensure we have a DB connection
+            await self.bot.wait_until_ready()
+            
+            # Make sure we have a DB connection
+            if not hasattr(self.bot, 'db') or self.bot.db is None or not hasattr(self.bot.db, 'csv_processor_state'):
+                logger.error("Cannot load CSV state: Database connection or collection not available")
+                return
+            
+            # Instead of one large document, we'll look up individual server states
+            # First, let's find all server state documents
+            server_states_cursor = self.bot.db.csv_processor_state.find({})
+            
+            # Keep track of how many servers we've loaded
+            server_count = 0
+            
+            async for state in server_states_cursor:
+                server_id = state.get("server_id")
+                if not server_id:
+                    continue  # Skip invalid documents
+                    
+                # Load last processed timestamp for this server
+                if "last_processed" in state:
+                    self.last_processed[server_id] = state["last_processed"]
+                
+                # Load last processed line positions for this server
+                if "line_positions" in state:
+                    if server_id not in self.last_processed_line_positions:
+                        self.last_processed_line_positions[server_id] = {}
+                    
+                    # Store line positions by filename
+                    self.last_processed_line_positions[server_id] = state["line_positions"]
+                
+                server_count += 1
+            
+            if server_count > 0:
+                logger.info(f"Loaded CSV processor state for {server_count} servers from database")
+                logger.info(f"Loaded {len(self.last_processed)} server timestamps")
+                
+                # Log detailed information about loaded timestamps
+                for server_id, timestamp in self.last_processed.items():
+                    logger.info(f"Loaded timestamp for server {server_id}: {timestamp.isoformat()}")
+                
+                logger.info(f"Loaded line positions for {len(self.last_processed_line_positions)} servers")
+                
+                # Log detailed information about loaded line positions
+                for server_id, positions in self.last_processed_line_positions.items():
+                    logger.info(f"Loaded {len(positions)} line positions for server {server_id}: {list(positions.keys())[:5]}")
+            else:
+                logger.info("No CSV processor state found in database, starting fresh")
+                
+            # Also check for legacy state format and migrate if needed
+            if hasattr(self.bot, 'db') and self.bot.db is not None and hasattr(self.bot.db, 'bot_config'):
+                legacy_state = await self.bot.db.bot_config.find_one({"key": "csv_processor_state"})
+            else:
+                legacy_state = None
+            if legacy_state and not server_count:
+                logger.info("Found legacy CSV processor state, migrating to new format...")
+                
+                # Migrate last processed timestamps
+                if "last_processed" in legacy_state:
+                    self.last_processed = legacy_state["last_processed"]
+                    # Save in new format
+                    for server_id, timestamp in self.last_processed.items():
+                        await self._save_server_state(server_id)
+                
+                # Migrate last processed line positions
+                if "last_processed_line_positions" in legacy_state:
+                    legacy_positions = legacy_state["last_processed_line_positions"]
+                    for server_id, files in legacy_positions.items():
+                        if server_id not in self.last_processed_line_positions:
+                            self.last_processed_line_positions[server_id] = {}
+                        self.last_processed_line_positions[server_id] = files
+                        await self._save_server_state(server_id)
+                
+                # Delete the legacy state document if possible
+                if hasattr(self.bot, 'db') and self.bot.db is not None and hasattr(self.bot.db, 'bot_config'):
+                    await self.bot.db.bot_config.delete_one({"key": "csv_processor_state"})
+                    logger.info("Migration complete, deleted legacy state")
+                else:
+                    logger.warning("Could not delete legacy state document - database connection not available")
+                
+        except Exception as e:
+            logger.error(f"Error loading CSV processor state: {e}")
+            # Continue anyway to avoid breaking functionality
+            
+    async def _save_server_state(self, server_id):
+        """Save current CSV processing state for a specific server
+        
+        Args:
+            server_id: The server ID to save state for
+        """
+        try:
+            # Make sure we have a DB connection
+            if self.bot.db is None:
+                logger.error(f"Cannot save CSV state for server {server_id}: Database connection not available")
+                return
+            
+            # Skip if we don't have data for this server
+            if server_id not in self.last_processed and server_id not in self.last_processed_line_positions:
+                return
+                
+            # Prepare state document for this server
+            state = {
+                "server_id": server_id,
+                "updated_at": datetime.now()
+            }
+            
+            # Add last processed timestamp if available
+            if server_id in self.last_processed:
+                state["last_processed"] = self.last_processed[server_id]
+            
+            # Add line positions if available
+            if server_id in self.last_processed_line_positions:
+                state["line_positions"] = self.last_processed_line_positions[server_id]
+            
+            # Upsert to csv_processor_state collection - guard against attribute errors 
+            # by not using truth value testing on the database object
+            if hasattr(self.bot, 'db') and self.bot.db is not None and hasattr(self.bot.db, 'csv_processor_state'):
+                await self.bot.db.csv_processor_state.update_one(
+                    {"server_id": server_id},
+                    {"$set": state},
+                    upsert=True
+                )
+            
+            logger.debug(f"Saved CSV processor state for server {server_id}")
+        except Exception as e:
+            logger.error(f"Error saving CSV state for server {server_id}: {e}")
+            
+    async def _save_state(self):
+        """Save current CSV processing state to database for all servers"""
+        try:
+            # Make sure we have a DB connection
+            if self.bot.db is None:
+                logger.error("Cannot save CSV state: Database connection not available")
+                return
+            
+            # Save state for each server individually
+            servers_saved = 0
+            for server_id in set(list(self.last_processed.keys()) + list(self.last_processed_line_positions.keys())):
+                await self._save_server_state(server_id)
+                servers_saved += 1
+            
+            if servers_saved > 0:
+                logger.debug(f"Saved CSV processor state for {servers_saved} servers")
+        except Exception as e:
+            logger.error(f"Error saving CSV state: {e}")
+            # Continue anyway to avoid breaking functionality
 
     def cog_unload(self):
         """Stop background tasks and close connections when cog is unloaded"""
@@ -340,6 +494,9 @@ class CSVProcessorCog(commands.Cog):
 
                 logger.warning(f"CRITICAL DEBUG: CSV processing completed. Files Found={total_found}, Files Processed={files_processed}, Events={events_processed}")
                 logger.info(f"CSV processing completed in {duration:.2f} seconds. Processed {files_count} CSV files with {events_count} events.")
+                
+                # Save final state to database to ensure it persists between restarts
+                asyncio.create_task(self._save_state())
             self.is_processing = False
 
     @process_csv_files_task.before_loop
@@ -633,6 +790,9 @@ class CSVProcessorCog(commands.Cog):
                 
                 # Log the action for audit trail
                 logger.info(f"Reset stale timestamp for server {server_id} to {self.last_processed[server_id]}")
+                
+                # Save updated timestamp to database
+                asyncio.create_task(self._save_server_state(server_id))
     
     async def _process_server_csv_files(self, server_id: str, config: Dict[str, Any], 
                                start_date: Optional[datetime] = None) -> Tuple[int, int]:
@@ -2040,12 +2200,16 @@ class CSVProcessorCog(commands.Cog):
                                                         # This helps regular mode pick up where historical left off
                                                         logger.info(f"CSV Processing: Storing line position {total_lines} for historical processing of {file_basename}")
                                                         self.last_processed_line_positions[server_id][file_basename] = total_lines
+                                                        # Save state to database after updating line positions in historical mode
+                                                        asyncio.create_task(self._save_server_state(server_id))
                                                     else:
                                                         # For regular mode, update only if we have a higher line count than before
                                                         current_position = self.last_processed_line_positions[server_id].get(file_basename, 0)
                                                         if total_lines > current_position:
                                                             logger.info(f"CSV Processing: Updating line position from {current_position} to {total_lines} for {file_basename}")
                                                             self.last_processed_line_positions[server_id][file_basename] = total_lines
+                                                            # Save state to database after updating line positions in regular mode
+                                                            asyncio.create_task(self._save_server_state(server_id))
                                                         else:
                                                             logger.info(f"CSV Processing: Keeping existing line position of {current_position} for {file_basename}")
                                                             
@@ -2053,6 +2217,13 @@ class CSVProcessorCog(commands.Cog):
                                                     if not hasattr(self, 'file_line_positions'):
                                                         self.file_line_positions = {}
                                                     self.file_line_positions[file_path] = total_lines
+                                                    
+                                                    # Update last_processed timestamp for this server when successful  
+                                                    # This helps avoid reprocessing files unnecessarily after restart
+                                                    if not is_historical_mode:
+                                                        self.last_processed[server_id] = datetime.now()
+                                                        # Save state to database
+                                                        asyncio.create_task(self._save_server_state(server_id))
                                                 break  # Success - exit retry loop
                                             except Exception as e:
                                                 if retry < max_retries:
@@ -2778,6 +2949,21 @@ class CSVProcessorCog(commands.Cog):
         try:
             logger.info(f"Clearing existing data for server {server_id} before historical parse (traditional method)")
 
+            # Clear CSV processor state for this server from database
+            if hasattr(self.bot, 'db') and self.bot.db is not None and hasattr(self.bot.db, 'csv_processor_state'):
+                state_result = await self.bot.db.csv_processor_state.delete_one({"server_id": server_id})
+                logger.info(f"Deleted CSV processor state for server {server_id} ({state_result.deleted_count} document)")
+                
+                # Also clear from memory
+                if server_id in self.last_processed:
+                    del self.last_processed[server_id]
+                    logger.info(f"Cleared last_processed timestamp for server {server_id} from memory")
+                    
+                if server_id in self.last_processed_line_positions:
+                    line_positions_count = len(self.last_processed_line_positions[server_id])
+                    del self.last_processed_line_positions[server_id]
+                    logger.info(f"Cleared last_processed_line_positions for server {server_id} from memory ({line_positions_count} entries)")
+
             # Delete all kill events for this server
             kill_result = await self.bot.db.kills.delete_many({"server_id": server_id})
             logger.info(f"Deleted {kill_result.deleted_count} existing kill events for server {server_id}")
@@ -2920,6 +3106,8 @@ class CSVProcessorCog(commands.Cog):
         # Safely update last_processed dictionary with server_id
         if server_id and isinstance(server_id, str):
             self.last_processed[server_id] = datetime.now() - timedelta(hours=safe_hours)
+            # Save updated state to database
+            asyncio.create_task(self._save_server_state(server_id))
         else:
             logger.warning(f"Invalid server_id: {server_id}, not updating last_processed timestamp")
 
@@ -3579,6 +3767,45 @@ class CSVProcessorCog(commands.Cog):
             except:
                 pass
             return None
+            
+    async def clear_server_state(self, server_id: str) -> bool:
+        """
+        Clear all CSV processor state for a specific server
+        This should be called when a server is removed from the bot
+        
+        Args:
+            server_id: The server ID to clear state for
+            
+        Returns:
+            bool: True if state was cleared successfully, False otherwise
+        """
+        try:
+            logger.info(f"Clearing CSV processor state for removed server {server_id}")
+            state_removed = False
+            
+            # Clear from database
+            if hasattr(self.bot, 'db') and self.bot.db is not None and hasattr(self.bot.db, 'csv_processor_state'):
+                state_result = await self.bot.db.csv_processor_state.delete_one({"server_id": server_id})
+                state_removed = state_result.deleted_count > 0
+                logger.info(f"Deleted CSV processor state for server {server_id} from database ({state_result.deleted_count} document)")
+            
+            # Clear from memory
+            memory_cleared = False
+            if server_id in self.last_processed:
+                del self.last_processed[server_id]
+                memory_cleared = True
+                logger.info(f"Cleared last_processed timestamp for server {server_id} from memory")
+                
+            if server_id in self.last_processed_line_positions:
+                line_positions_count = len(self.last_processed_line_positions[server_id])
+                del self.last_processed_line_positions[server_id]
+                memory_cleared = True
+                logger.info(f"Cleared last_processed_line_positions for server {server_id} from memory ({line_positions_count} entries)")
+            
+            return state_removed or memory_cleared
+        except Exception as e:
+            logger.error(f"Error clearing CSV processor state for server {server_id}: {e}")
+            return False
 
 async def setup(bot: Any) -> None:
     """Set up the CSV processor cog
