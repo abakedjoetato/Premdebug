@@ -176,7 +176,7 @@ async def test_csv_batch_processing():
                     # Parse content
                     events = parser.parse_csv_data(content)
                     
-                    if not events:
+                    if events is None:
                         logger.error(f"No events parsed from file {sample_file}")
                         results["errors"].append(f"No events parsed from file {sample_file}")
                         results["timestamp_parsing"] = False
@@ -244,7 +244,7 @@ async def test_csv_batch_processing():
                     # Count existing events
                     db = bot.db
                     existing_count = 0
-                    if db:
+                    if db is not None:
                         existing_count = await db.kills.count_documents({"server_id": SERVER_ID})
                         logger.info(f"Found {existing_count} existing events in database")
                     
@@ -261,7 +261,7 @@ async def test_csv_batch_processing():
                     results["events_processed"] = events_processed
                     
                     # Check database
-                    if db:
+                    if db is not None:
                         new_count = await db.kills.count_documents({"server_id": SERVER_ID})
                         logger.info(f"Now have {new_count} events in database (added {new_count - existing_count})")
                         

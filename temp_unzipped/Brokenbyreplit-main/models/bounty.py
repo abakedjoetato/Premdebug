@@ -57,7 +57,7 @@ class Bounty(BaseModel):
         **kwargs
     ):
         self._id = None
-        self.bounty_id = bounty_id or str(uuid.uuid4())
+        self.bounty_id = bounty_id if bounty_id is not None else \2))
         self.target_id = target_id
         self.target_name = target_name
         self.placed_by_id = placed_by_id

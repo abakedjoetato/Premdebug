@@ -93,7 +93,7 @@ def validate_mukti_guild(ctx):
     from config import MUKTI_GUILD_ID
     
     # If no specific guild ID is configured, allow all guilds
-    if not MUKTI_GUILD_ID:
+    if MUKTI_GUILD_ID is None:
         return True
     
     return str(ctx.guild.id) == str(MUKTI_GUILD_ID)

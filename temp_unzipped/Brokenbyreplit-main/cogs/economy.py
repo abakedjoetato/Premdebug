@@ -60,7 +60,7 @@ class Economy(commands.Cog):
         player_id = str(ctx.author.id)
         economy = await EconomyModel.get_by_player(self.bot.db, player_id, server_id)
 
-        if not economy:
+        if economy is None:
             # Create new economy account
             economy = await EconomyModel.create_or_update(self.bot.db, player_id, server_id)
 
@@ -131,7 +131,7 @@ class Economy(commands.Cog):
         player_id = str(ctx.author.id)
         economy = await EconomyModel.get_by_player(self.bot.db, player_id, server_id)
 
-        if not economy:
+        if economy is None:
             # Create new economy account
             economy = await EconomyModel.create_or_update(self.bot.db, player_id, server_id)
 
@@ -187,7 +187,7 @@ class Economy(commands.Cog):
             timeout_seconds=5
         )
         
-        if not richest_players or len(richest_players) == 0:
+        if not richest_players if richest_players is not None else \2) == 0:
             embed = await EmbedBuilder.create_error_embed(
                 "No Data",
                 f"No player economy data found for server {server_name}.",
@@ -253,7 +253,7 @@ class Economy(commands.Cog):
         player_id = str(ctx.author.id)
         economy = await EconomyModel.get_by_player(self.bot.db, player_id, server_id)
 
-        if not economy:
+        if economy is None:
             # Create new economy account
             economy = await EconomyModel.create_or_update(self.bot.db, player_id, server_id)
 
@@ -366,7 +366,7 @@ class Economy(commands.Cog):
         player_id = str(ctx.author.id)
         economy = await EconomyModel.get_by_player(self.bot.db, player_id, server_id)
 
-        if not economy:
+        if economy is None:
             # Create new economy account
             economy = await EconomyModel.create_or_update(self.bot.db, player_id, server_id)
 
@@ -455,7 +455,7 @@ class Economy(commands.Cog):
             timeout_seconds=5
         )
 
-        if not player_economy:
+        if player_economy is None:
             # Create new economy account
             player_economy = await retryable(
                 EconomyModel.create_or_update,
@@ -575,7 +575,7 @@ class Economy(commands.Cog):
             timeout_seconds=5
         )
 
-        if not economy:
+        if economy is None:
             # Create new economy account
             economy = await retryable(
                 EconomyModel.create_or_update,
@@ -621,7 +621,7 @@ class Economy(commands.Cog):
                 timeout_seconds=5
             )
 
-            if not removal_result:
+            if removal_result is None:
                 embed = await EmbedBuilder.create_error_embed(
                     "Insufficient Funds",
                     f"Player only has {initial_balance} credits. Cannot remove {abs(amount)} credits.",
@@ -701,7 +701,7 @@ class Economy(commands.Cog):
             timeout_seconds=5
         )
 
-        if not economy:
+        if economy is None:
             # Create new economy account
             economy = await retryable(
                 EconomyModel.create_or_update,
@@ -832,7 +832,7 @@ class Economy(commands.Cog):
         )
         
         # Ensure stats is not None
-        if not stats:
+        if stats is None:
             stats = {}  # Use an empty dict as fallback for safe access
             logger.warning(f"No economy statistics found for server {server_id}")
 
@@ -930,7 +930,7 @@ class Economy(commands.Cog):
             guild_model = None
             try:
                 guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
-                if guild_data:
+                if guild_data is not None:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
             except Exception as e:
@@ -941,7 +941,7 @@ class Economy(commands.Cog):
 
             # Validate server ID
             server = await guild.get_server(server_id)
-            if not server:
+            if server is None:
                 embed = await EmbedBuilder.create_error_embed(
                     "Invalid Server",
                     f"Could not find server with ID '{server_id}'. "

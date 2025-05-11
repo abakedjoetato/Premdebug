@@ -109,7 +109,7 @@ class CSVProcessorCog(commands.Cog):
             # Get server configurations
             server_configs = await self._get_server_configs()
 
-            if not server_configs:
+            if server_configs is None:
                 logger.warning("No servers with SFTP enabled found, skipping CSV processing")
                 return
 
@@ -210,7 +210,7 @@ class CSVProcessorCog(commands.Cog):
                     server_id = str(server.get("server_id", ""))
                     raw_server_id = str(server.get("original_server_id", server_id))
 
-                    if not server_id:
+                    if server_id is None:
                         continue
 
                     await self._process_server_config(server, server_id, raw_server_id, server_configs)
@@ -221,7 +221,7 @@ class CSVProcessorCog(commands.Cog):
                     server_id = str(server.get("server_id", ""))
                     raw_server_id = str(server.get("original_server_id", server_id))
 
-                    if not server_id:
+                    if server_id is None:
                         continue
 
                     await self._process_server_config(server, server_id, raw_server_id, server_configs)
@@ -235,7 +235,7 @@ class CSVProcessorCog(commands.Cog):
                                 server_id = str(server.get("server_id", ""))
                                 raw_server_id = str(server.get("original_server_id", server_id))
 
-                                if not server_id:
+                                if server_id is None:
                                     continue
 
                                 # Add guild ID to the server config
@@ -259,7 +259,7 @@ class CSVProcessorCog(commands.Cog):
             raw_server_id: Original server ID from database
             server_configs: Dictionary to add the processed config to
         """
-        if not server_id:
+        if server_id is None:
             return
 
         # Extract SFTP details
@@ -490,7 +490,7 @@ class CSVProcessorCog(commands.Cog):
             # Get server configurations
             server_configs = await self._get_server_configs()
 
-            if not server_configs:
+            if server_configs is None:
                 await interaction.followup.send("No servers with SFTP enabled found")
                 return
 
@@ -503,7 +503,7 @@ class CSVProcessorCog(commands.Cog):
                         server_id = sid
                         break
 
-            if not server_id:
+            if server_id is None:
                 # List available servers
                 servers_list = "\n".join([f"{sid}: {config.get('name', 'Unknown')}" for sid, config in server_configs.items()])
                 await interaction.followup.send(f"Please specify a server ID. Available servers:\n{servers_list}")
@@ -573,7 +573,7 @@ class CSVProcessorCog(commands.Cog):
             # Get server configurations
             server_configs = await self._get_server_configs()
 
-            if not server_configs:
+            if server_configs is None:
                 await interaction.followup.send("No servers with SFTP enabled found")
                 return
 
@@ -586,7 +586,7 @@ class CSVProcessorCog(commands.Cog):
                         server_id = sid
                         break
 
-            if not server_id:
+            if server_id is None:
                 # List available servers
                 servers_list = "\n".join([f"{sid}: {config.get('name', 'Unknown')}" for sid, config in server_configs.items()])
                 await interaction.followup.send(f"Please specify a server ID. Available servers:\n{servers_list}")
@@ -629,7 +629,7 @@ class CSVProcessorCog(commands.Cog):
             # Get server configurations
             server_configs = await self._get_server_configs()
 
-            if not server_configs:
+            if server_configs is None:
                 await interaction.followup.send("No servers with SFTP enabled found")
                 return
 
@@ -774,7 +774,7 @@ class CSVProcessorCog(commands.Cog):
         if self.bot.db is None:
             return None
 
-        if not player_id or not player_name:
+        if player_id is None or not player_name:
             return None
 
         try:
@@ -784,9 +784,9 @@ class CSVProcessorCog(commands.Cog):
                 "server_id": server_id
             })
 
-            if player:
+            if player is not None:
                 # Check if we need to update the name
-                if player_name and player_name != player.get("name"):
+                if player_name is not None and player_name != player.get("name"):
                     # Add to known aliases if different from current name
                     known_aliases = player.get("known_aliases", [])
                     if player_name not in known_aliases:

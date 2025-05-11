@@ -27,7 +27,7 @@ async def reset_database():
     """Reset the MongoDB database to a clean state"""
     # Connect to MongoDB
     mongodb_uri = os.environ.get('MONGODB_URI', '')
-    if not mongodb_uri:
+    if mongodb_uri is None:
         logger.error("MONGODB_URI environment variable not set")
         return False
         
@@ -68,7 +68,7 @@ def main():
     
     result = asyncio.run(reset_database())
     
-    if result:
+    if result is not None:
         print("Database reset completed successfully.")
         return 0
     else:

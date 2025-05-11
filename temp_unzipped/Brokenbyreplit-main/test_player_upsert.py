@@ -69,11 +69,11 @@ async def main():
         
         # Setup known_aliases
         known_aliases = []
-        if existing_player and "known_aliases" in existing_player and existing_player["known_aliases"]:
+        if existing_player is not None and "known_aliases" in existing_player and existing_player["known_aliases"]:
             known_aliases = existing_player["known_aliases"]
             
         # Add old name to aliases if not already there
-        if existing_player and existing_player["name"] and existing_player["name"] not in known_aliases:
+        if existing_player is not None and existing_player["name"] and existing_player["name"] not in known_aliases:
             known_aliases.append(existing_player["name"])
             
         # Update player data with new name

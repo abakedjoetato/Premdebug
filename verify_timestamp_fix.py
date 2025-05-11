@@ -40,7 +40,7 @@ async def main():
     
     # Parse test data
     events = parser.parse_csv_data(test_csv_line)
-    if not events:
+    if events is None:
         logger.error("Failed to parse test CSV data")
         return
         
@@ -74,7 +74,7 @@ async def main():
         
         # Get server configurations
         server_configs = await csv_processor._get_server_configs()
-        if not server_configs:
+        if server_configs is None:
             logger.error("No server configurations found")
             return
             
@@ -83,7 +83,7 @@ async def main():
             server_id = config.get("server_id")
             name = config.get("name", "Unknown")
             
-            if not server_id:
+            if server_id is None:
                 continue
                 
             logger.info(f"Testing server: {name} (ID: {server_id})")
@@ -120,7 +120,7 @@ async def main():
                     
                 # Parse the CSV content
                 events = parser.parse_csv_data(content)
-                if not events:
+                if events is None:
                     logger.error(f"No events parsed from {csv_file}")
                     continue
                     

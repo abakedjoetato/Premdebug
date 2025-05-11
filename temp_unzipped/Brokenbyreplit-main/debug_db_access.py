@@ -77,7 +77,7 @@ async def check_database_access():
         logger.info(f"Found {len(sftp_servers)} SFTP-enabled servers in emeralds_killfeed.servers")
         
         # Log all fields in the server document
-        if sftp_servers:
+        if sftp_servers is not None:
             logger.info("Server document fields:")
             for key, value in sftp_servers[0].items():
                 logger.info(f"  {key}: {value}")
@@ -89,7 +89,7 @@ async def check_database_access():
         logger.info(f"Found {len(sftp_game_servers)} SFTP-enabled servers in emeralds_killfeed.game_servers")
         
         # Log all fields in the game_server document
-        if sftp_game_servers:
+        if sftp_game_servers is not None:
             logger.info("Game Server document fields:")
             for key, value in sftp_game_servers[0].items():
                 logger.info(f"  {key}: {value}")

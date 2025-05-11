@@ -48,7 +48,7 @@ class Killfeed(commands.Cog):
             guild_model = None
             try:
                 guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
-                if guild_data:
+                if guild_data is not None:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
             except Exception as e:
@@ -60,7 +60,7 @@ class Killfeed(commands.Cog):
 
             # Get guild data
             guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
-            if not guild_data:
+            if guild_data is None:
                 embed = EmbedBuilder.create_error_embed(
                     "Error",
                     "This guild is not set up. Please use the setup commands first."
@@ -75,7 +75,7 @@ class Killfeed(commands.Cog):
                     server_exists = True
                     break
 
-            if not server_exists:
+            if server_exists is None:
                 embed = EmbedBuilder.create_error_embed(
                     "Error",
                     f"Server '{server_id}' not found in this guild. Please use an existing server name."
@@ -148,7 +148,7 @@ class Killfeed(commands.Cog):
             guild_model = None
             try:
                 guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
-                if guild_data:
+                if guild_data is not None:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
             except Exception as e:
@@ -201,7 +201,7 @@ class Killfeed(commands.Cog):
             guild_model = None
             try:
                 guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
-                if guild_data:
+                if guild_data is not None:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
             except Exception as e:
@@ -209,7 +209,7 @@ class Killfeed(commands.Cog):
 
             # Get guild data
             guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
-            if not guild_data:
+            if guild_data is None:
                 embed = EmbedBuilder.create_error_embed(
                     "Error",
                     "This guild is not set up. Please use the setup commands first."
@@ -318,7 +318,7 @@ class Killfeed(commands.Cog):
                     try:
                         guild_data = await self.bot.db.guilds.find_one({"servers.server_id": server_id})
                         guild_model = None
-                        if guild_data:
+                        if guild_data is not None:
                             # Use create_from_db_document to ensure proper conversion of premium_tier
                             guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
 
@@ -365,7 +365,7 @@ async def start_killfeed_monitor(bot, guild_id: int, server_id: str):
 
     # Check if guild exists in bot's cache
     discord_guild = bot.get_guild(int(guild_id))
-    if not discord_guild:
+    if discord_guild is None:
         logger.error(f"Guild {guild_id} not found in bot's cache - skipping killfeed monitor")
         return
 
@@ -374,7 +374,7 @@ async def start_killfeed_monitor(bot, guild_id: int, server_id: str):
     try:
         # Get server data
         server = await Server.get_by_id(bot.db, server_id, guild_id)
-        if not server:
+        if server is None:
             logger.error(f"Server {server_id} not found in guild {guild_id}")
             return
 
@@ -386,10 +386,10 @@ async def start_killfeed_monitor(bot, guild_id: int, server_id: str):
             # Send a direct message to administrators about missing configuration
             try:
                 guild_model = await Guild.get_by_id(bot.db, guild_id)
-                if guild_model and guild_model.admin_role_id:
+                if guild_model is not None and guild_model.admin_role_id:
                     # Try to get admin role
                     guild = bot.get_guild(guild_id)
-                    if guild:
+                    if guild is not None:
                         admin_role = guild.get_role(guild_model.admin_role_id)
                         if admin_role and admin_role.members:
                             admin = admin_role.members[0]  # Get first admin
@@ -438,7 +438,7 @@ async def start_killfeed_monitor(bot, guild_id: int, server_id: str):
             # Try to notify an admin if possible
             try:
                 guild = bot.get_guild(guild_id)
-                if guild and guild.owner:
+                if guild is not None and guild.owner:
                     await guild.owner.send(f"⚠️ Could not connect to SFTP server for {server.name}. Error: {sftp_client.last_error}")
             except Exception:
                 pass  # Silently ignore if we can't message the owner
@@ -456,7 +456,7 @@ async def start_killfeed_monitor(bot, guild_id: int, server_id: str):
 
         # Get killfeed channel
         guild = bot.get_guild(guild_id)
-        if not guild:
+        if guild is None:
             logger.error(f"Guild {guild_id} not found - will continue processing data without sending Discord messages")
             # Don't return here, we'll still process data for when the guild is available later
 
@@ -500,7 +500,7 @@ async def start_killfeed_monitor(bot, guild_id: int, server_id: str):
                 channel_configured = False
         else:
             channel_configured = False
-            logger.info(f"Guild or channel not available, continuing without killfeed channel for server {server_id}")
+            logger.info(f"Guild not found or not configured, continuing without killfeed channel for server {server_id}")
 
         # Send initial notification to confirm monitor is running
         if channel_configured and killfeed_channel:
@@ -647,7 +647,7 @@ async def start_killfeed_monitor(bot, guild_id: int, server_id: str):
                         # Try to notify an admin if possible
                         try:
                             guild = bot.get_guild(guild_id)
-                            if guild and guild.owner:
+                            if guild is not None and guild.owner:
                                 await guild.owner.send(f"⚠️ Killfeed monitor for {server.name} has been stopped due to too many connection failures. Please restart it manually with `/killfeed start`.")
                         except Exception:
                             pass  # Silently ignore if we can't message the owner
@@ -673,9 +673,9 @@ async def start_killfeed_monitor(bot, guild_id: int, server_id: str):
         # Try to send notification that monitor has stopped
         try:
             guild = bot.get_guild(guild_id)
-            if guild:
+            if guild is not None:
                 server = await Server.get_by_id(bot.db, server_id, guild_id)
-                if server and server.killfeed_channel_id:
+                if server is not None and server.killfeed_channel_id:
                     try:
                         # Ensure channel ID is an integer
                         channel_id = server.killfeed_channel_id
@@ -745,7 +745,7 @@ async def process_kill_event(bot, server, kill_event, channel):
         has_economy = False
         guild_model = None
 
-        if guild_data:
+        if guild_data is not None:
             # Use create_from_db_document to ensure proper conversion of premium_tier
             guild_model = Guild.create_from_db_document(guild_data, bot.db)
             has_economy = guild_model.check_feature_access("economy")
@@ -879,7 +879,7 @@ async def update_player_stats(bot, server_id, kill_event):
 
         # Get guild data for the server to check premium features
         guild_data = await bot.db.guilds.find_one({"servers.server_id": server_id})
-        if guild_data:
+        if guild_data is not None:
             guild = Guild(bot.db, guild_data)
             has_economy = guild.check_feature_access("economy")
             has_rivalries = guild.check_feature_access("rivalries")
@@ -898,7 +898,7 @@ async def update_player_stats(bot, server_id, kill_event):
             suicide_result = await victim.record_suicide(kill_event["suicide_type"])
 
             # Verify the suicide was recorded
-            if not suicide_result:
+            if suicide_result is None:
                 logger.warning(f"Failed to record suicide for player {victim_name} ({victim_id}) - retrying with updated data")
                 # Try one more time with fresh data
                 victim = await Player.get_by_id(bot.db, victim_id, server_id)
@@ -934,7 +934,7 @@ async def update_player_stats(bot, server_id, kill_event):
                 )
 
                 # Verify the kill was recorded
-                if not kill_result:
+                if kill_result is None:
                     logger.warning(f"Failed to record kill for player {killer_name} ({killer_id}) - retrying with updated data")
                     # Try one more time with fresh data
                     killer = await Player.get_by_id(bot.db, killer_id, server_id)
@@ -985,7 +985,7 @@ async def update_player_stats(bot, server_id, kill_event):
                     # This is non-critical, so we continue processing
 
                 # Verify the death was recorded
-                if not death_result:
+                if death_result is None:
                     logger.warning(f"Failed to record death for player {victim_name} ({victim_id}) - retrying with updated data")
                     # Try one more time with fresh data
                     victim = await Player.get_by_id(bot.db, victim_id, server_id)

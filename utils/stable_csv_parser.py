@@ -98,7 +98,7 @@ class StableCSVParser:
                 try:
                     # Parse the row into an event
                     event = self._parse_row_to_event(row, server_id)
-                    if event:
+                    if event is not None:
                         processed_events.append(event)
                 except Exception as e:
                     logger.error(f"Error parsing row {row_num} in {file_path}: {e}")

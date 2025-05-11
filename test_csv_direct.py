@@ -130,7 +130,7 @@ async def test_csv_timestamp_parsing():
                 # Parse events
                 events = csv_parser.parse(content, server_id=SERVER_ID)
                 
-                if not events:
+                if events is None:
                     logger.warning(f"No events found in {file_path}")
                     failed_files += 1
                     continue

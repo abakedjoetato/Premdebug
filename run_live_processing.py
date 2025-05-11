@@ -61,7 +61,7 @@ async def main():
         
         # Get server configs
         server_configs = await processor._get_server_configs()
-        if not server_configs:
+        if server_configs is None:
             await message.edit(content="❌ Error: No server configurations found")
             logger.error("No server configurations found")
             return
@@ -74,7 +74,7 @@ async def main():
             server_id = config.get("server_id")
             server_name = config.get("name", "Unknown")
             
-            if not server_id:
+            if server_id is None:
                 continue
                 
             # Set last processed date to 60 days ago

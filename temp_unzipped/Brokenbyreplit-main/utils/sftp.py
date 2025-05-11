@@ -306,7 +306,7 @@ async def get_sftp_client(
     pwd = password or sftp_password or kwargs.get('pwd')
 
     # Create connection key
-    if not server_id:
+    if server_id is None:
         logger.warning("SFTP client requested without server_id, this prevents proper isolation")
         # Generate a unique ID to avoid conflicts
         server_id = f"anonymous_{random.randint(1000, 9999)}"
@@ -422,25 +422,25 @@ class SFTPManager:
         try:
             from utils.server_identity import identify_server, KNOWN_SERVERS
             
-            # Start with reasonable default: provided original_server_id or server_id (will be improved)
+            # Start with reasonable default: provided original_server_id if original_server_id is not None else \2)
             self.original_server_id = original_server_id or server_id
             
             # Priority 1: Check KNOWN_SERVERS mapping for server_id (highest authority)
             # This is the authoritative source for numeric IDs, and should be used whenever possible
-            if server_id and server_id in KNOWN_SERVERS:
+            if server_id is not None and server_id in KNOWN_SERVERS:
                 numeric_id = KNOWN_SERVERS[server_id]
                 logger.info(f"SFTPClient using known numeric ID '{numeric_id}' for path construction instead of '{server_id}'")
                 self.original_server_id = numeric_id
                 
             # Priority 2: If original_server_id is provided and is numeric, use it directly
             # This is likely a numeric ID explicitly provided by the caller
-            elif original_server_id and str(original_server_id).isdigit():
+            elif original_server_id is not None and str(original_server_id).isdigit():
                 logger.info(f"SFTPClient using provided numeric original_server_id: {original_server_id}")
                 # Already set in default above
                 
             # Priority 3: If original_server_id is provided but is a UUID, try to map it
             # This handles the case where we're given a UUID as original_server_id
-            elif original_server_id and len(str(original_server_id)) > 10:
+            elif original_server_id is not None and len(str(original_server_id)) > 10:
                 # First check if this UUID is in KNOWN_SERVERS
                 if original_server_id in KNOWN_SERVERS:
                     numeric_id = KNOWN_SERVERS[original_server_id]
@@ -450,7 +450,7 @@ class SFTPManager:
                     # Use server_identity module to resolve the UUID
                     # This will check all possible ways to determine the numeric server ID
                     numeric_id, is_known = identify_server(
-                        server_id=original_server_id or "",
+                        server_id=original_server_id if original_server_id is not None else \2,
                         hostname=hostname or "",
                         server_name=server_id or ""  # Use server_id as fallback server_name
                     )
@@ -467,7 +467,7 @@ class SFTPManager:
                             self.original_server_id = extracted_id
             
             # 4. Priority 4: If we have a non-UUID server_id, use it directly if numeric
-            elif server_id and str(server_id).isdigit():
+            elif server_id is not None and str(server_id).isdigit():
                 logger.info(f"SFTPClient using numeric server_id directly: {server_id}")
                 self.original_server_id = server_id
                 
@@ -475,7 +475,7 @@ class SFTPManager:
             else:
                 # Use all available information for best match
                 numeric_id, is_known = identify_server(
-                    server_id=server_id or "",  # Ensure we pass a string, not None
+                    server_id=server_id if server_id is not None else \2,  # Ensure we pass a string, not None
                     hostname=hostname or "",    # Ensure we pass a string, not None
                     server_name="",  # No name available at this level
                     guild_id=None  # No guild ID available at this level
@@ -507,9 +507,9 @@ class SFTPManager:
             logger.error(f"Error in server identity resolution: {e}")
             
             # Set a fallback ID
-            if original_server_id:
+            if original_server_id is not None:
                 self.original_server_id = original_server_id
-            elif server_id and str(server_id).isdigit():
+            elif server_id is not None and str(server_id).isdigit():
                 self.original_server_id = server_id
             else:
                 # Extract numeric parts from server_id
@@ -1082,7 +1082,7 @@ class SFTPManager:
                         logger.info(f"Using numeric ID from hostname: {path_server_id}")
                 
                 # PRIORITY 3: Last resort - use server_id but log a warning since this is likely a UUID
-                if not path_server_id:
+                if path_server_id is None:
                     path_server_id = self.server_id
                     logger.warning(f"No numeric server ID found for path construction, using UUID as fallback: {path_server_id}")
                 
@@ -1208,7 +1208,7 @@ class SFTPManager:
                         result = []
                         await self.client.find_files_recursive("/", r"Deadside\.log", result, recursive=True, max_depth=6)
 
-                        if result:
+                        if result is not None:
                             logger.info(f"Found Deadside.log through recursive search: {result[0]}")
                             return result[0]
                     elif hasattr(self.client, 'find_files_by_pattern'):
@@ -1216,7 +1216,7 @@ class SFTPManager:
                         logger.info("Using find_files_by_pattern for recursive search")
                         result = await self.client.find_files_by_pattern("/", r"Deadside\.log", recursive=True, max_depth=10)
 
-                        if result:
+                        if result is not None:
                             logger.info(f"Found Deadside.log through pattern search: {result[0]}")
                             return result[0]
                 except Exception as search_error:
@@ -1807,7 +1807,7 @@ class SFTPClient:
             self.original_server_id = str(self.original_server_id)
         
         # Always log the server ID being used for path construction
-        if original_server_id and str(original_server_id) != str(server_id):
+        if original_server_id is not None and str(original_server_id) != str(server_id):
             logger.info(f"SFTPClient using original server ID '{original_server_id}' for path construction instead of '{server_id}'")
         else:
             logger.info(f"SFTPClient using server ID '{server_id}' for path construction")
@@ -2690,7 +2690,7 @@ class SFTPClient:
             logger.info(f"Using server ID '{path_server_id}' for path construction in get_log_file")
 
             # Use provided server_dir if available, otherwise construct it
-            if not server_dir:
+            if server_dir is None:
                 hostname = self.hostname.split(':')[0] if self.hostname else "server" 
                 server_dir = f"{hostname}_{path_server_id}"
                 logger.info(f"Constructed server directory: {server_dir}")
@@ -3680,7 +3680,7 @@ class SFTPClient:
             if server_uuid in KNOWN_SERVERS:
                 path_server_id = KNOWN_SERVERS[server_uuid]
                 logger.info(f"Using known numeric ID '{path_server_id}' for path construction")
-            elif path_server_id and not path_server_id.isdigit() and '-' in path_server_id:
+            elif path_server_id is not None and not path_server_id.isdigit() and '-' in path_server_id:
                 # Try to extract numeric portion from UUID
                 numeric_match = re.match(r'^([0-9]+)-', path_server_id)
                 if numeric_match:

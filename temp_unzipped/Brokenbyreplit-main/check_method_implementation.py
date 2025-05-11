@@ -25,7 +25,7 @@ def check_directory_exists_implementation():
         
         # Get method docstring
         doc = method.__doc__
-        if doc:
+        if doc is not None:
             doc_first_line = doc.strip().split('\n')[0]
             print(f"  Method docstring: {doc_first_line}")
         else:

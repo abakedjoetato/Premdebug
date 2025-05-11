@@ -68,7 +68,7 @@ def is_home_guild_admin(bot, user_id: int) -> bool:
     if not hasattr(bot, 'home_guild_id') or not bot.home_guild_id:
         # Try to get home_guild_id from environment
         home_guild_id = os.environ.get('HOME_GUILD_ID')
-        if not home_guild_id:
+        if home_guild_id is None:
             # No home guild set in environment
             return False
         try:
@@ -81,7 +81,7 @@ def is_home_guild_admin(bot, user_id: int) -> bool:
     
     # Get home guild
     home_guild = bot.get_guild(bot.home_guild_id)
-    if not home_guild:
+    if home_guild is None:
         logger.warning(f"Bot is not in home guild with ID: {bot.home_guild_id}")
         return False
     
@@ -167,7 +167,7 @@ async def get_guild_premium_tier(db, guild_id: str) -> int:
     guild_coll = db["guilds"]
     guild_doc = await guild_coll.find_one({"guild_id": str(guild_id)})
     
-    if not guild_doc:
+    if guild_doc is None:
         return 0
         
     return guild_doc.get("premium_tier", 0)

@@ -37,7 +37,7 @@ class Premium(commands.Cog):
             guild_model = None
             try:
                 guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
-                if guild_data:
+                if guild_data is not None:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
                     logger.info(f"PREMIUM DEBUG: Premium status - guild premium tier: {guild_model.premium_tier}")
@@ -125,7 +125,7 @@ class Premium(commands.Cog):
             guild = await Guild.get_or_create(self.bot.db, ctx.guild.id, ctx.guild.name)
             
             # If we couldn't get or create a guild, that's a serious database error
-            if not guild:
+            if guild is None:
                 embed = await EmbedBuilder.create_error_embed(
                     "Database Error",
                     "Failed to access guild data. Please try again later."
@@ -229,7 +229,7 @@ class Premium(commands.Cog):
             guild = await Guild.get_or_create(self.bot.db, ctx.guild.id, ctx.guild.name)
             
             # If we couldn't get or create a guild, that's a serious database error
-            if not guild:
+            if guild is None:
                 embed = await EmbedBuilder.create_error_embed(
                     "Database Error",
                     "Failed to access guild data. Please try again later."
@@ -248,7 +248,7 @@ class Premium(commands.Cog):
 
             # Get home guild
             home_guild = self.bot.get_guild(self.bot.home_guild_id)
-            if not home_guild:
+            if home_guild is None:
                 embed = await EmbedBuilder.create_error_embed(
                     "Error",
                     "Could not find the home guild. Please contact the bot owner."
@@ -422,7 +422,7 @@ class Premium(commands.Cog):
             # Premium is guild-based, not server-based (Rule #9)
             # Use get_or_create to ensure premium works without requiring server setup
             guild = await Guild.get_or_create(self.bot.db, ctx.guild.id, ctx.guild.name)
-            if not guild:
+            if guild is None:
                 # This is a database error, not a setup issue
                 embed = await EmbedBuilder.create_error_embed(
                     "Database Error",
@@ -493,7 +493,7 @@ class Premium(commands.Cog):
             # Get guild model
             guild = await Guild.get_or_create(self.bot.db, ctx.guild.id, ctx.guild.name)
             
-            if not guild:
+            if guild is None:
                 await ctx.send("Failed to get guild model")
                 return
                 

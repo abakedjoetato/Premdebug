@@ -17,7 +17,7 @@ from models.server import Server
 from utils.sftp import SFTPClient
 from utils.embed_builder import EmbedBuilder
 from utils.helpers import has_admin_permission
-from utils.parsers import CSVParser
+from utils.csv_parser import CSVParser
 from utils.decorators import premium_tier_required
 from utils.discord_utils import server_id_autocomplete, hybrid_send
 from config import PREMIUM_TIERS
@@ -34,7 +34,7 @@ class Setup(commands.Cog):
     @commands.guild_only()
     async def setup(self, ctx):
         """Setup command group"""
-        if ctx.invoked_subcommand is None:
+        if not ctx.invoked_subcommand:
             await ctx.send("Please specify a subcommand.")
 
     @setup.command(name="addserver", description="Add a game server to track PvP stats")
@@ -62,7 +62,7 @@ class Setup(commands.Cog):
             # Use get_or_create which will auto-create guild if it doesn't exist
             try:
                 guild_model = await Guild.get_or_create(self.bot.db, str(ctx.guild.id), ctx.guild.name)
-                if guild_model is None:
+                if not guild_model:
                     logger.error(f"Failed to get or create guild for {ctx.guild.id}")
                     await hybrid_send(ctx, "Error retrieving guild information. Please try again later.")
                     return
@@ -74,8 +74,8 @@ class Setup(commands.Cog):
                 return
 
             # Get guild premium tier and server count
-            guild_tier = int(guild_model.premium_tier) if guild_model.premium_tier is not None else 0
-            server_count = len(guild_model.servers) if hasattr(guild_model, 'servers') and guild_model.servers is not None else 0
+            guild_tier = int(guild_model.premium_tier) if guild_model.premium_tier else 0
+            server_count = len(guild_model.servers) if hasattr(guild_model, 'servers') and guild_model.servers else 0
 
             # Check server limit based on premium tier
             from config import PREMIUM_TIERS
@@ -110,7 +110,7 @@ class Setup(commands.Cog):
             }
 
             # Validate SFTP info
-            if host is None or not username or not password:
+            if not host or not username or not password:
                 embed = await EmbedBuilder.create_error_embed(
                     "Invalid SFTP Information",
                     "Please provide valid host, username, and password for SFTP connection."
@@ -150,12 +150,31 @@ class Setup(commands.Cog):
             message = await hybrid_send(ctx, embed=embed)
 
             # Create SFTP client to test connection
+            # For new server setup, we check if the server_id is numeric or a UUID
+            # If it's numeric, use it directly for path construction
+            # If it's a UUID, use the server_name to extract the numeric ID if possible
+            original_server_id = server_id
+            
+            # If server ID looks like a UUID format, try to extract a numeric ID from server name
+            if "-" in server_id and len(server_id) > 30:
+                logger.info(f"Server ID appears to be in UUID format: {server_id}")
+                
+                # Try to find a numeric ID in the server name (often contains the numeric ID)
+                for word in str(server_name).split():
+                    if word.isdigit() and len(word) >= 4:
+                        logger.info(f"Found potential numeric server ID in server_name: {word}")
+                        original_server_id = word
+                        break
+            
+            logger.info(f"Using original_server_id: {original_server_id} for path construction")
+            
             sftp_client = SFTPClient(
                 hostname=sftp_info["hostname"],  # Updated to match key in sftp_info dictionary
                 port=sftp_info["port"],
                 username=sftp_info["username"],
                 password=sftp_info["password"],
-                server_id=server_id
+                server_id=server_id,
+                original_server_id=original_server_id  # Pass original ID for path construction
             )
 
             # Test connection
@@ -181,8 +200,13 @@ class Setup(commands.Cog):
             , guild=guild_model)
             await message.edit(embed=embed)
 
+            # Get log file path but don't disconnect afterwards
             log_file = await sftp_client.get_log_file()
-            log_found = log_file is not None
+            log_found = bool(log_file)
+            
+            # Keep connection object for later use (don't disconnect)
+            # This is critical to prevent the connection from being closed prematurely
+            logger.info(f"Maintaining SFTP connection for server {server_id} (log_found: {log_found})")
 
             # Create proper Server object first
             server = await Server.create_server(
@@ -196,7 +220,8 @@ class Setup(commands.Cog):
                 sftp_host=sftp_info["hostname"],
                 sftp_port=sftp_info["port"],
                 sftp_username=sftp_info["username"],
-                sftp_password=sftp_info["password"]
+                sftp_password=sftp_info["password"],
+                original_server_id=original_server_id  # Pass the extracted or derived original server ID
             )
 
             if not server:
@@ -207,9 +232,19 @@ class Setup(commands.Cog):
                 await message.edit(embed=embed)
                 return
 
-            # Create server data for guild
+            # Build separate paths for logs and CSV
+            base_server_dir = f"{sftp_info['hostname'].split(':')[0]}_{original_server_id}"
+            
+            # Log parser path (in /Logs)
+            log_parser_path = os.path.join("/", base_server_dir, "Logs")
+            
+            # CSV parser path (in /actual1/deathlogs)
+            csv_parser_base = os.path.join("/", base_server_dir, "actual1", "deathlogs")
+            
+            # Create server data with separated parser paths
             server_data = {
                 "server_id": server.server_id,
+                "original_server_id": original_server_id,
                 "server_name": server_name,
                 "guild_id": str(ctx.guild.id),
                 "sftp_host": sftp_info["hostname"],
@@ -221,8 +256,16 @@ class Setup(commands.Cog):
                 "username": sftp_info["username"],
                 "password": sftp_info["password"],
                 "last_csv_line": 0,
-                "last_log_line": 0
+                "last_log_line": 0,
+                "sftp_enabled": True,
+                "historical_parse_done": False,  # Add flag to track whether historical parsing has been done
+                # Separate paths for each parser
+                "log_parser_path": log_parser_path,  # For log parser only
+                "csv_parser_path": csv_parser_base   # For CSV parser only
             }
+            
+            # Log both IDs for diagnostic purposes
+            logger.info(f"Adding server with UUID: {server.server_id} and original ID: {original_server_id}")
 
             # Add server to guild
             add_result = await guild.add_server(server_data)
@@ -232,7 +275,8 @@ class Setup(commands.Cog):
                     "Failed to add server to the database. This may be due to a server limit restriction."
                 , guild=guild_model)
                 await message.edit(embed=embed)
-                await sftp_client.disconnect()
+                # Keep the connection in the pool, don't disconnect
+                # await sftp_client.disconnect()
                 return
 
             # Success message
@@ -245,7 +289,9 @@ class Setup(commands.Cog):
             connection_status = [
                 f"SFTP Connection: Successful",
                 f"Log File: {'Found' if log_found else 'Not found'}",
-                f"CSV Files: Will be located during historical parsing"
+                f"CSV Files: Will be located during historical parsing",
+                f"",
+                f"**Note**: Historical parsing will begin in 30 seconds to ensure database synchronization."
             ]
             embed.add_field(
                 name="Connection Status", 
@@ -266,9 +312,11 @@ class Setup(commands.Cog):
             )
 
             await message.edit(embed=embed)
-            await sftp_client.disconnect()
+            # Don't disconnect the SFTP client here
+            # The connection will be reused by the historical parser and other processes
+            # await sftp_client.disconnect()
 
-            # Start historical parsing automatically
+            # Start historical parsing automatically only for newly added servers
             try:
                 # Update the message with parsing info
                 embed = await EmbedBuilder.create_info_embed(
@@ -277,6 +325,170 @@ class Setup(commands.Cog):
                     + "\n\nThis process will run in the background and may take some time depending on the amount of data."
                 , guild=guild_model)
                 await message.edit(embed=embed)
+                
+                # Mark that we're explicitly running the historical parse for a new server
+                # This is a new server addition, not a bot restart
+                server_data["is_new_server"] = True
+                
+                # Actually start the historical parse - find CSV processor cog
+                csv_processor_cog = None
+                for cog_name, cog in self.bot.cogs.items():
+                    if cog_name == "CSVProcessorCog" or hasattr(cog, "run_historical_parse"):
+                        csv_processor_cog = cog
+                        break
+                
+                if csv_processor_cog and hasattr(csv_processor_cog, "run_historical_parse"):
+                    # Create a background task for historical parsing
+                    task_name = f"historical_parse_{ctx.guild.id}_{server_id}"
+                    
+                    async def run_historical_parse_task():
+                        try:
+                            # Add a delay to ensure database writes are complete and server ID mappings are loaded
+                            delay_seconds = 30
+                            logger.info(f"Waiting {delay_seconds} seconds before starting historical parse for server {server_id} to ensure database writes are complete")
+                            await asyncio.sleep(delay_seconds)
+                            
+                            # Check if this is a new server addition
+                            # This prevents historical parsing from running on bot restart
+                            if not server_data.get("is_new_server", False):
+                                logger.info(f"Skipping historical parse for server {server_id} - not a new server addition")
+                                return
+                                
+                            logger.info(f"Proceeding with historical parse for newly added server {server_id}")
+                            
+                            # CRITICAL BUGFIX #1: After adding a new server, the historical parser needs to:
+                            # 1. Ensure the server mapping is loaded in the KNOWN_SERVERS dictionary
+                            # 2. Pass complete configuration to the historical parser
+                            # 3. Use original_server_id consistently for path construction
+                            
+                            # First, reload the server ID mappings to ensure our new server is in KNOWN_SERVERS
+                            from utils.server_identity import load_server_mappings
+                            mapping_count = await load_server_mappings(self.bot.db)
+                            logger.info(f"Reloaded {mapping_count} server ID mappings before historical parse")
+                            
+                            # Next, retrieve the complete server configuration to pass directly
+                            # Try multiple collections to ensure we find it
+                            server_config = None
+                            
+                            # Try the servers collection first (primary location)
+                            try:
+                                server_doc = await self.bot.db.servers.find_one({"server_id": server_id})
+                                if server_doc:
+                                    server_config = server_doc
+                                    db_server_id = server_doc.get("server_id")
+                                    db_original_id = server_doc.get("original_server_id")
+                                    logger.info(f"Found server in servers collection: id={db_server_id}, original_id={db_original_id}")
+                            except Exception as db_err:
+                                logger.error(f"Error retrieving from servers collection: {db_err}")
+                            
+                            # If not found in servers, try game_servers
+                            if not server_config:
+                                try:
+                                    server_doc = await self.bot.db.game_servers.find_one({"server_id": server_id})
+                                    if server_doc:
+                                        server_config = server_doc
+                                        db_server_id = server_doc.get("server_id")
+                                        db_original_id = server_doc.get("original_server_id")
+                                        logger.info(f"Found server in game_servers collection: id={db_server_id}, original_id={db_original_id}")
+                                except Exception as db_err:
+                                    logger.error(f"Error retrieving from game_servers collection: {db_err}")
+                            
+                            # If still not found, try the guilds collection
+                            if not server_config:
+                                try:
+                                    guild_id_str = str(ctx.guild_id) if hasattr(ctx, 'guild_id') else (str(ctx.guild.id) if ctx.guild else None)
+                                    if guild_id_str:
+                                        guild_doc = await self.bot.db.guilds.find_one({"guild_id": guild_id_str})
+                                        if guild_doc and "servers" in guild_doc:
+                                            for guild_server in guild_doc.get("servers", []):
+                                                if guild_server.get("server_id") == server_id:
+                                                    server_config = guild_server
+                                                    logger.info(f"Found server in guilds.servers array: id={server_id}, original_id={guild_server.get('original_server_id')}")
+                                                    break
+                                except Exception as db_err:
+                                    logger.error(f"Error retrieving from guilds collection: {db_err}")
+                            
+                            # CRITICAL BUGFIX #2: Ensure original_server_id is properly set for path construction
+                            # This fixes the UUID vs numeric ID issue with newly added servers
+                            
+                            # If we found a configuration, use it for the parse
+                            # If not, fall back to just the server ID and rely on automatic resolution
+                            if server_config:
+                                # Ensure SFTP credentials are set correctly
+                                if not server_config.get("hostname") and server_config.get("sftp_host"):
+                                    server_config["hostname"] = server_config.get("sftp_host")
+                                if not server_config.get("port") and server_config.get("sftp_port"):
+                                    server_config["port"] = server_config.get("sftp_port")
+                                if not server_config.get("username") and server_config.get("sftp_username"):
+                                    server_config["username"] = server_config.get("sftp_username")
+                                if not server_config.get("password") and server_config.get("sftp_password"):
+                                    server_config["password"] = server_config.get("sftp_password")
+                                
+                                # Add the original server ID if needed - CRITICAL for correct path construction
+                                if not server_config.get("original_server_id") and original_server_id:
+                                    server_config["original_server_id"] = original_server_id
+                                    logger.info(f"Added original_server_id {original_server_id} to server config")
+                                
+                                # Use the complete configuration - this will bypass most resolution issues
+                                logger.info(f"Historical parse will use complete server configuration with original_server_id={server_config.get('original_server_id')}")
+                                
+                                # Pass guild_id for proper isolation
+                                guild_id_str = str(ctx.guild_id) if hasattr(ctx, 'guild_id') else (str(ctx.guild.id) if ctx.guild else None)
+                                
+                                # Set flag to indicate historical parsing is in progress/done
+                                try:
+                                    # Update the server configuration to mark historical parsing as done
+                                    await self.bot.db.guilds.update_one(
+                                        {"guild_id": guild_id_str, "servers.server_id": server_id},
+                                        {"$set": {"servers.$.historical_parse_done": True}}
+                                    )
+                                    logger.info(f"Marked server {server_id} as having historical parsing in progress")
+                                except Exception as flag_err:
+                                    logger.error(f"Error setting historical parse flag: {flag_err}")
+                                
+                                # Call the historical parse with direct configuration
+                                files_processed, events_processed = await csv_processor_cog.run_historical_parse_with_config(
+                                    server_id, 
+                                    server_config,
+                                    days=30,
+                                    guild_id=guild_id_str
+                                )
+                            else:
+                                # Fall back to standard parse if we couldn't find configuration
+                                logger.warning(f"Could not find complete server configuration, falling back to standard parse")
+                                parse_id = original_server_id if original_server_id else server_id
+                                
+                                # Pass guild_id for proper isolation
+                                guild_id_str = str(ctx.guild_id) if hasattr(ctx, 'guild_id') else (str(ctx.guild.id) if ctx.guild else None)
+                                
+                                files_processed, events_processed = await csv_processor_cog.run_historical_parse(
+                                    parse_id, 
+                                    days=30,
+                                    guild_id=guild_id_str
+                                )
+                            
+                            # Log the results
+                            logger.info(f"Historical parse complete for server {server_id}: processed {files_processed} files with {events_processed} events")
+                            
+                            # Update message if possible
+                            try:
+                                updated_embed = await EmbedBuilder.create_success_embed(
+                                    "Historical Parse Complete",
+                                    f"Completed historical data parsing for server '{server_name}'.\n\n"
+                                    f"Processed {files_processed} CSV files and {events_processed} death events."
+                                , guild=guild_model)
+                                await message.edit(embed=updated_embed)
+                            except Exception as msg_err:
+                                logger.error(f"Error updating message after historical parse: {msg_err}")
+                        except Exception as task_err:
+                            logger.error(f"Error in historical parse task: {task_err}")
+                    
+                    # Create and start the task
+                    task = asyncio.create_task(run_historical_parse_task())
+                    self.bot.background_tasks[task_name] = task
+                    logger.info(f"Started historical parse task: {task_name}")
+                else:
+                    logger.error("Could not find CSV processor cog for historical parsing")
             except Exception as e:
                 logger.error(f"Error starting historical parse for new server: {e}")
 
@@ -303,11 +515,28 @@ class Setup(commands.Cog):
             if await self._check_permission(ctx):
                 return
 
+            # Log the raw server ID from the command for diagnostic purposes
+            logger.info(f"Remove server command called with server_id: '{server_id}', type: {type(server_id)}")
+            
+            # Import standardization function
+            from utils.server_utils import standardize_server_id
+            std_server_id = standardize_server_id(str(server_id) if server_id is not None else "")
+            logger.info(f"Standardized server_id for removal: '{std_server_id}'")
+
             # Get guild model with proper error handling
             try:
                 guild_model = await Guild.get_or_create(self.bot.db, str(ctx.guild.id), ctx.guild.name)
                 if not guild_model:
                     raise ValueError("Failed to get or create guild model")
+                    
+                # Log all servers in guild for debugging
+                logger.info(f"Servers in guild {ctx.guild.id} ({ctx.guild.name}):")
+                for i, s in enumerate(guild_model.servers):
+                    s_id = s.get("server_id")
+                    s_name = s.get("server_name", "Unknown")
+                    std_id = standardize_server_id(str(s_id) if s_id is not None else "")
+                    logger.info(f"  - Server {i}: ID={s_id}, StdID={std_id}, Name={s_name}, Type={type(s_id)}")
+                    
             except Exception as e:
                 logger.error(f"Error getting guild model: {e}")
                 embed = await EmbedBuilder.create_error_embed(
@@ -317,8 +546,42 @@ class Setup(commands.Cog):
                 await hybrid_send(ctx, embed=embed)
                 return
 
+            # First check if server exists in guild.servers directly
+            # This addresses the issue where Server.get_by_id might not find a server
+            # but it's still visible in the autocomplete and guild configuration
+            server_in_guild = None
+            for s in guild_model.servers:
+                s_id = s.get("server_id")
+                std_id = standardize_server_id(str(s_id) if s_id is not None else "")
+                
+                # Try multiple matching approaches
+                if (s_id == server_id or  # Direct match
+                    std_id == std_server_id or  # Standardized match
+                    (std_id.isdigit() and std_server_id.isdigit() and int(std_id) == int(std_server_id))):  # Numeric match
+                    server_in_guild = s
+                    logger.info(f"Found server in guild.servers: {s_id} (matched using {'direct' if s_id == server_id else 'standardized' if std_id == std_server_id else 'numeric'} comparison)")
+                    break
+            
             # Get server from database using proper lookup
             server = await Server.get_by_id(self.bot.db, str(server_id), str(ctx.guild.id))
+            
+            # If server not found in game_servers but exists in guild.servers, create a temporary server object
+            if not server and server_in_guild:
+                logger.info(f"Server not found in game_servers but exists in guild.servers, creating temporary server object")
+                # Create a basic server object from the guild.servers entry
+                from models.server import Server as ServerModel
+                server = ServerModel(
+                    db=self.bot.db,
+                    server_id=std_server_id,
+                    guild_id=str(ctx.guild.id),
+                    name=server_in_guild.get("server_name", "Unknown Server"),
+                    sftp_host=server_in_guild.get("sftp_host", ""),
+                    sftp_port=server_in_guild.get("sftp_port", 22),
+                    sftp_username=server_in_guild.get("sftp_username", ""),
+                    sftp_password=server_in_guild.get("sftp_password", ""),
+                    log_path=server_in_guild.get("log_path", "")
+                )
+                
             if not server:
                 embed = await EmbedBuilder.create_error_embed(
                     "Server Not Found", 
@@ -330,7 +593,8 @@ class Setup(commands.Cog):
 
             # Add confirmation button
             class ConfirmView(discord.ui.View):
-                def __init__(self, timeout=60):
+                def __init__(self, bot, timeout=60):
+                    self.bot = bot
                     super().__init__(timeout=timeout)
 
                 @discord.ui.button(label="Confirm", style=discord.ButtonStyle.danger)
@@ -340,41 +604,166 @@ class Setup(commands.Cog):
                         return
 
                     try:
-                        # Remove server and its integrations
+                        # Capture all the variables we need before deletion
+                        server_name = server.name
+                        server_id_val = server.server_id
+                        guild_id_val = str(ctx.guild.id)
+                        
+                        # Import server utils here for consistent ID handling
+                        from utils.server_utils import standardize_server_id
+                        std_server_id = standardize_server_id(str(server_id_val) if server_id_val is not None else "")
+                        
+                        # First update the guild model directly (this is safer than deletion)
+                        logger.info(f"Removing server from guild first. Raw ID: {server_id_val}, Type: {type(server_id_val)}")
+                        logger.info(f"Standardized ID for removal: {std_server_id}")
+                        
+                        # Make sure we have the latest version of the guild model
+                        fresh_guild_model = await Guild.get_by_id(self.bot.db, guild_id_val)
+                        if fresh_guild_model is not None:
+                            await fresh_guild_model.remove_server(std_server_id)
+                            logger.info(f"Successfully removed server from guild.servers array")
+                        else:
+                            logger.warning(f"Could not get fresh guild model for {guild_id_val}")
+                            
+                        # Cleanup historical parsing flags in all collections
+                        try:
+                            # Clean historical parse flags in guilds collection
+                            await self.bot.db.guilds.update_one(
+                                {"guild_id": guild_id_val, "servers.server_id": std_server_id},
+                                {"$set": {"servers.$.historical_parse_done": False}}
+                            )
+                            logger.info(f"Cleared historical parse flags for server {std_server_id}")
+                            
+                            # Clean flags in standalone servers collection
+                            await self.bot.db.servers.update_one(
+                                {"server_id": std_server_id},
+                                {"$set": {"historical_parse_done": False}}
+                            )
+                        except Exception as flag_err:
+                            logger.error(f"Error clearing historical parse flags: {flag_err}")
+                            
+                        # Now use the server object to delete from all collections
                         success = await server.delete(self.bot.db)
-                        if not success:
-                            raise ValueError("Failed to delete server")
+                        # We need to use explicit is None check for MongoDB compatibility
+                        if success is None or success is False:
+                            logger.warning(f"Server.delete() reported no deletions, but continuing with task cleanup")
+                        
+                        # Also try direct deletion from each collection as a backup
+                        try:
+                            # Delete using standardized ID from game_servers
+                            result = await self.bot.db.game_servers.delete_many({"server_id": std_server_id})
+                            logger.info(f"Backup deletion from game_servers: {result.deleted_count} documents")
+                            
+                            # Delete from servers collection too
+                            result = await self.bot.db.servers.delete_many({"server_id": std_server_id})
+                            logger.info(f"Backup deletion from servers: {result.deleted_count} documents")
+                            
+                            # Clean up players collection - mark players as inactive
+                            player_result = await self.bot.db.players.update_many(
+                                {"server_id": std_server_id},
+                                {"$set": {"active": False, "updated_at": datetime.utcnow()}}
+                            )
+                            logger.info(f"Marked {player_result.modified_count} players as inactive")
+                            
+                            # Clean up kills collection
+                            kills_result = await self.bot.db.kills.delete_many({"server_id": std_server_id})
+                            logger.info(f"Removed {kills_result.deleted_count} kill records")
+                            
+                            # Clean up rivalries collection
+                            rivalries_result = await self.bot.db.rivalries.delete_many({"server_id": std_server_id})
+                            logger.info(f"Removed {rivalries_result.deleted_count} rivalry records")
+                            
+                            # Clean up other collections
+                            for collection_name in ["events", "historical_data", "factions", "bounties"]:
+                                try:
+                                    if hasattr(self.bot.db, collection_name):
+                                        result = await self.bot.db[collection_name].delete_many({"server_id": std_server_id})
+                                        logger.info(f"Removed {result.deleted_count} {collection_name} records")
+                                except Exception as coll_err:
+                                    logger.error(f"Error cleaning up {collection_name}: {coll_err}")
+                            
+                            # Clean up CSV processor state
+                            try:
+                                # First clean from database
+                                state_result = await self.bot.db.csv_processor_state.delete_one({"server_id": std_server_id})
+                                logger.info(f"Removed CSV processor state for server {std_server_id} from database ({state_result.deleted_count} documents)")
+                                
+                                # Then try to use the CSV processor cog method if it's loaded
+                                csv_processor = self.bot.get_cog("CSVProcessorCog")
+                                if csv_processor and hasattr(csv_processor, "clear_server_state"):
+                                    success = await csv_processor.clear_server_state(std_server_id)
+                                    logger.info(f"CSV processor state cleanup result: {success}")
+                                else:
+                                    logger.warning(f"CSV processor cog not found or missing clear_server_state method")
+                            except Exception as csv_err:
+                                logger.error(f"Error cleaning up CSV processor state: {csv_err}")
+                                    
+                        except Exception as deletion_err:
+                            logger.error(f"Error in backup deletion: {deletion_err}")
 
-                        # Remove from guild configuration
-                        await guild_model.remove_server(server.server_id)
-
-                        # Stop running tasks
+                        # Stop running tasks - use raw server_id from command for consistent lookup
                         task_names = [
-                            f"killfeed_{ctx.guild.id}_{server_id}",
-                            f"events_{ctx.guild.id}_{server_id}"
+                            f"killfeed_{guild_id_val}_{server_id}",  # Original server_id from command
+                            f"events_{guild_id_val}_{server_id}"
                         ]
 
                         for task_name in task_names:
-                            if task_name in self.bot.background_tasks:
-                                self.bot.background_tasks[task_name].cancel()
-                                del self.bot.background_tasks[task_name]
-                                logger.info(f"Stopped task: {task_name}")
+                            try:
+                                if task_name in self.bot.background_tasks:
+                                    task = self.bot.background_tasks[task_name]
+                                    if not task.done() and not task.cancelled():
+                                        task.cancel()
+                                    del self.bot.background_tasks[task_name]
+                                    logger.info(f"Stopped task: {task_name}")
+                            except Exception as task_err:
+                                logger.error(f"Error stopping task {task_name}: {task_err}")
 
+                        # Create success message
                         embed = await EmbedBuilder.create_success_embed(
                             "Server Removed",
-                            f"Successfully removed server '{server.name}'.",
-                            guild=guild_model
+                            f"Successfully removed server '{server_name}'.",
+                            # Explicitly check for None - don't use "or" operator with MongoDB objects
+                            guild=(fresh_guild_model if fresh_guild_model is not None else guild_model)
                         )
-                        await interaction.response.edit_message(embed=embed, view=None)
+                        
+                        # Send response - handle interaction errors
+                        try:
+                            await interaction.response.edit_message(embed=embed, view=None)
+                        except discord.errors.InteractionResponded:
+                            # If already responded, use followup
+                            await interaction.followup.send(embed=embed)
+                        except Exception as resp_err:
+                            logger.error(f"Error responding to interaction: {resp_err}")
+                            # Try one more fallback method
+                            try:
+                                if hasattr(interaction, 'edit_original_response'):
+                                    await interaction.edit_original_response(embed=embed, view=None)
+                            except:
+                                pass
 
                     except Exception as e:
                         logger.error(f"Error removing server: {e}")
                         embed = await EmbedBuilder.create_error_embed(
                             "Error",
                             f"Failed to remove server: {str(e)}",
-                            guild=guild_model
+                            # Explicitly use the guild_model with database objects
+                            guild=guild_model if guild_model is not None else None
                         )
-                        await interaction.response.edit_message(embed=embed, view=None)
+                        
+                        # Handle interaction errors properly
+                        try:
+                            await interaction.response.edit_message(embed=embed, view=None)
+                        except discord.errors.InteractionResponded:
+                            # If already responded, use followup
+                            await interaction.followup.send(embed=embed)
+                        except Exception as resp_err:
+                            logger.error(f"Error responding to interaction in error handler: {resp_err}")
+                            # Try one more fallback method
+                            try:
+                                if hasattr(interaction, 'edit_original_response'):
+                                    await interaction.edit_original_response(embed=embed, view=None)
+                            except:
+                                pass
 
                 @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
                 async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -387,7 +776,21 @@ class Setup(commands.Cog):
                         "Server removal cancelled.",
                         guild=guild_model
                     )
-                    await interaction.response.edit_message(embed=embed, view=None)
+                    
+                    # Handle interaction errors properly
+                    try:
+                        await interaction.response.edit_message(embed=embed, view=None)
+                    except discord.errors.InteractionResponded:
+                        # If already responded, use followup
+                        await interaction.followup.send(embed=embed)
+                    except Exception as resp_err:
+                        logger.error(f"Error responding to interaction in cancel button: {resp_err}")
+                        # Try one more fallback method
+                        try:
+                            if hasattr(interaction, 'edit_original_response'):
+                                await interaction.edit_original_response(embed=embed, view=None)
+                        except:
+                            pass
 
             # Create confirmation embed
             embed = await EmbedBuilder.create_warning_embed(
@@ -398,8 +801,8 @@ class Setup(commands.Cog):
                 guild=guild_model
             )
 
-            # Send confirmation message
-            await hybrid_send(ctx, embed=embed, view=ConfirmView())
+            # Send confirmation message with the bot instance passed to the view
+            await hybrid_send(ctx, embed=embed, view=ConfirmView(self.bot))
 
         except Exception as e:
             logger.error(f"Error in remove_server command: {e}")
@@ -424,7 +827,7 @@ class Setup(commands.Cog):
                 return
 
             # Get server count
-            server_count = len(guild.servers) if hasattr(guild, 'servers') and guild.servers is not None else 0
+            server_count = len(guild.servers) if hasattr(guild, 'servers') and guild.servers else 0
 
             if server_count == 0:
                 embed = await EmbedBuilder.create_info_embed(
@@ -443,7 +846,7 @@ class Setup(commands.Cog):
             )
 
             # Get premium tier
-            premium_tier = int(guild.premium_tier) if guild.premium_tier is not None else 0
+            premium_tier = int(guild.premium_tier) if guild.premium_tier else 0
             tier_name = PREMIUM_TIERS.get(premium_tier, {}).get("name", f"Tier {premium_tier}")
             max_servers = PREMIUM_TIERS.get(premium_tier, {}).get("max_servers", 1)
 

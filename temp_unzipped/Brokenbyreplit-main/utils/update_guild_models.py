@@ -45,7 +45,7 @@ def process_file(file_path):
             if indentation:
                 indent = indentation.group(1)
                 # Add guild model initialization before embed creation
-                guild_model_code = f"\n{indent}# Get guild model for themed embed\n{indent}guild_data = None\n{indent}guild_model = None\n{indent}try:\n{indent}    guild_data = await self.bot.db.guilds.find_one({{\"guild_id\": ctx.guild.id}})\n{indent}    if guild_data:\n{indent}        guild_model = Guild(self.bot.db, guild_data)\n{indent}except Exception as e:\n{indent}    logger.warning(f\"Error getting guild model: {{e}}\")\n"
+                guild_model_code = f"\n{indent}# Get guild model for themed embed\n{indent}guild_data = None\n{indent}guild_model = None\n{indent}try:\n{indent}    guild_data = await self.bot.db.guilds.find_one({{\"guild_id\": ctx.guild.id}})\n{indent}    if guild_data is not None:\n{indent}        guild_model = Guild(self.bot.db, guild_data)\n{indent}except Exception as e:\n{indent}    logger.warning(f\"Error getting guild model: {{e}}\")\n"
                 return function_code.replace('try:', 'try:' + guild_model_code, 1) + embed_creation
         
         return function_code + embed_creation

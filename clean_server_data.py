@@ -48,9 +48,9 @@ async def cleanup_orphaned_servers(db):
         guild_id = server.get("guild_id")
         
         # Check if guild exists
-        if guild_id:
+        if guild_id is not None:
             guild = await db.guilds.find_one({"guild_id": guild_id})
-            if not guild:
+            if guild is None:
                 logger.info(f"Found orphaned server {server_id} with non-existent guild {guild_id}")
                 # Remove the server
                 result = await db.game_servers.delete_one({"server_id": server_id})
@@ -154,7 +154,7 @@ async def main():
     
     # Connect to database
     db = await connect_to_db()
-    if not db:
+    if db is None:
         logger.error("Failed to connect to database, exiting")
         return 1
     

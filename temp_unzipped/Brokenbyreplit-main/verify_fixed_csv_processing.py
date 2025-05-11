@@ -198,7 +198,7 @@ async def test_csv_parsing(content, file_path, server_id):
         logger.info(f"Parsed {len(events)} events from {total_lines} lines")
         
         # Log the first event
-        if events:
+        if events is not None:
             logger.info(f"First event: {events[0]}")
             
             # Validate all events have required fields
@@ -281,7 +281,7 @@ async def main():
             if content:
                 # Parse CSV
                 events = await test_csv_parsing(content, file_path, server_id)
-                if events:
+                if events is not None:
                     logger.info(f"✅ Successfully parsed events from {file_path}")
                 else:
                     logger.warning(f"❌ Failed to parse events from {file_path}")

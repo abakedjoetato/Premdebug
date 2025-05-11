@@ -174,7 +174,7 @@ class Server(BaseModel):
         # Standardize the server_id to ensure consistent formatting
         standardized_server_id = standardize_server_id(server_id)
         
-        if not standardized_server_id:
+        if standardized_server_id is None:
             logger.warning(f"Invalid server_id format: {server_id}")
             return None
             
@@ -188,7 +188,7 @@ class Server(BaseModel):
         document = await db.game_servers.find_one(query)
         
         # If no results, try case-insensitive search
-        if not document:
+        if document is None:
             logger.debug(f"No exact match for server_id: {standardized_server_id}, trying case-insensitive search")
             # Create a new case-insensitive search query
             # MongoDB regex pattern for case-insensitive matching
@@ -205,7 +205,7 @@ class Server(BaseModel):
             logger.debug(f"Server not found in game_servers, checking guild's server list")
             guild_doc = await db.guilds.find_one({"guild_id": str(guild_id)})
             
-            if guild_doc and "servers" in guild_doc:
+            if guild_doc is not None and "servers" in guild_doc:
                 for server in guild_doc.get("servers", []):
                     # Standardize server ID from guild.servers for comparison
                     server_id_in_guild = standardize_server_id(server.get("server_id"))
@@ -218,7 +218,7 @@ class Server(BaseModel):
                         original_server_id = server.get("original_server_id")
                         
                         # If original_server_id is not found, try to extract it from server_id
-                        if not original_server_id:
+                        if original_server_id is None:
                             # Check if server_id contains numeric segment that could be original ID
                             if server.get("server_id") and any(char.isdigit() for char in server.get("server_id", "")):
                                 # Extract numeric part of server ID as fallback for original ID
@@ -280,7 +280,7 @@ class Server(BaseModel):
             game_servers_cursor = db.game_servers.find({"guild_id": guild_id_str})
             async for document in game_servers_cursor:
                 server = cls.from_document(document)
-                if server:
+                if server is not None:
                     servers.append(server)
         except Exception as e:
             logger.error(f"Error fetching servers from game_servers collection: {e}")
@@ -484,7 +484,7 @@ class Server(BaseModel):
         # IMPORTANT: Extract numeric ID from server name if not provided
         from utils.server_identity import identify_server
         
-        if not original_server_id:
+        if original_server_id is None:
             logger.info(f"No original_server_id provided, attempting to extract from name: '{name}'")
             # Try to extract numeric ID from server name or construct a useful one
             for word in str(name).split():
@@ -495,7 +495,7 @@ class Server(BaseModel):
                     break
                     
             # If we still don't have an original_server_id, ask server_identity module
-            if not original_server_id:
+            if original_server_id is None:
                 numeric_id, is_known = identify_server(
                     server_id=server_id,
                     hostname=hostname or sftp_host,
@@ -508,7 +508,7 @@ class Server(BaseModel):
                     logger.info(f"Using identified numeric ID '{numeric_id}' for path construction")
         
         # If we still don't have a numeric ID, create one from last 4 digits of UUID
-        if not original_server_id:
+        if original_server_id is None:
             # Extract the last 4-5 digits of the UUID as a fallback numeric ID
             uuid_digits = ''.join(filter(str.isdigit, server_id))
             original_server_id = uuid_digits[-5:] if len(uuid_digits) >= 5 else uuid_digits

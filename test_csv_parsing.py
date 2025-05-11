@@ -101,7 +101,7 @@ async def test_csv_parser(csv_files: List[str]):
                     events = parser.parse_csv_data(content, delimiter=delimiter)
                     
                     # Track success based on number of events
-                    if events and len(events) > most_events:
+                    if events is not None and len(events) > most_events:
                         most_events = len(events)
                         best_result = {
                             "delimiter": name,
@@ -115,7 +115,7 @@ async def test_csv_parser(csv_files: List[str]):
                     logger.warning(f"Error parsing with {name} delimiter: {e}")
             
             # Record results from best parsing strategy
-            if best_result:
+            if best_result is not None:
                 results["successful_files"] += 1
                 results["total_events"] += best_result["count"]
                 

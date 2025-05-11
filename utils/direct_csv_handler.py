@@ -327,7 +327,7 @@ async def direct_import_events(db, events: List[Dict[str, Any]]) -> int:
     Returns:
         Number of events imported
     """
-    if not events:
+    if events is None:
         return 0
         
     logger.info(f"Directly importing {len(events)} events")
@@ -356,7 +356,7 @@ async def process_directory(db, server_id: str, days: int = 30) -> Tuple[int, in
     """
     logger.info(f"Processing CSV files from all directories for server {server_id}, looking back {days} days")
     
-    if not server_id:
+    if server_id is None:
         logger.error("No server ID provided")
         return 0, 0
     
@@ -370,7 +370,7 @@ async def process_directory(db, server_id: str, days: int = 30) -> Tuple[int, in
     try:
         # Look up the server in the database to get the original_server_id
         server_doc = await db.game_servers.find_one({"server_id": server_id})
-        if server_doc and "original_server_id" in server_doc:
+        if server_doc is not None and "original_server_id" in server_doc:
             original_server_id = server_doc["original_server_id"]
             logger.info(f"Found original_server_id {original_server_id} from database for server {server_id}")
             server_config = server_doc
@@ -385,7 +385,7 @@ async def process_directory(db, server_id: str, days: int = 30) -> Tuple[int, in
     ]
     
     # Add server-specific directories
-    if original_server_id:
+    if original_server_id is not None:
         # Common format is hostname_serverid
         # Get hostname from config
         hostname = server_config.get("hostname") if server_config else None
@@ -468,7 +468,7 @@ async def process_directory(db, server_id: str, days: int = 30) -> Tuple[int, in
                 logger.info(f"Added common location: {location}")
     
     # Add the server_id as a possible subdirectory name to check
-    if server_id and not server_id.startswith('/'):
+    if server_id is not None and not server_id.startswith('/'):
         for root_dir in unique_base_dirs.copy():
             potential_server_dir = os.path.join(root_dir, server_id)
             if os.path.exists(potential_server_dir) and os.path.isdir(potential_server_dir):
@@ -630,7 +630,7 @@ async def process_directory(db, server_id: str, days: int = 30) -> Tuple[int, in
             # Parse events - unpack tuple return value (events, line_count)
             events, line_count = direct_parse_csv_file(file_path, server_id)
             
-            if events:
+            if events is not None:
                 logger.info(f"Successfully parsed {len(events)} events from {os.path.basename(file_path)} ({line_count} total lines)")
                 
                 # Import events with better error handling
@@ -731,7 +731,7 @@ async def update_player_stats(db, server_id: str) -> int:
                 'player_id': player_id
             })
             
-            if player:
+            if player is not None:
                 # Update existing player
                 result = await db.players.update_one(
                     {'_id': player['_id']},

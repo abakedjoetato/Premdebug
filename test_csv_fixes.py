@@ -84,7 +84,7 @@ async def main():
         # Run the test
         result = await test_csv_processing()
         
-        if result:
+        if result is not None:
             logger.info("All tests PASSED")
             return True
         else:

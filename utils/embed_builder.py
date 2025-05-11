@@ -1029,7 +1029,7 @@ class EmbedBuilder:
             title=f"{server_name} Statistics",
             color=color,
             fields=fields,
-            thumbnail_url=server_icon or cls.ICONS["stats"],
+            thumbnail_url=server_icon if server_icon is not None else None,
             footer_text="Last updated",
             timestamp=datetime.utcnow(),
             guild=guild,

@@ -41,7 +41,7 @@ async def test_csv_parser():
         try:
             events = parser.parse_csv_data(test_data, delimiter=';')
             logger.info(f"Successfully parsed {len(events)} events with delimiter parameter")
-            if events:
+            if events is not None:
                 logger.info(f"First event: {events[0]}")
                 
                 # Verify timestamp parsing

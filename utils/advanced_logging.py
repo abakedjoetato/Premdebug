@@ -440,7 +440,7 @@ class AuditLogger:
         # Create extra context
         extra = {
             "username": username,
-            "guild_id": guild_id or "N/A",
+            "guild_id": guild_id if guild_id is not None else "",
             "action": action,
             "details": details,
             "target": target

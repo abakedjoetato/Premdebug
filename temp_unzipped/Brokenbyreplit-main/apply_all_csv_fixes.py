@@ -115,13 +115,13 @@ def main():
     success = True
     for module in fix_modules:
         module_result = run_fix_module(module)
-        if not module_result:
+        if module_result is None:
             logger.error(f"Fix module {module} failed")
             success = False
             
     # Run test parser to verify fixes
     test_result = run_test_parser()
-    if not test_result:
+    if test_result is None:
         logger.warning("Direct parser test failed, but fixes have been applied")
     
     # Final status

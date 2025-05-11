@@ -11,8 +11,8 @@ import logging
 import asyncio
 from datetime import datetime
 import discord
-from discord import app_commands
 from discord.ext import commands
+from discord import app_commands
 from typing import Optional, Dict, List, Any
 
 from models.player import Player
@@ -57,14 +57,14 @@ class PlayerLinksCog(commands.Cog):
         """
         await interaction.response.defer(ephemeral=True)
 
-        # Get server ID from guild config if provided is None
-        if server_id is None or server_id == "":
+        # Get server ID from guild config if not provided
+        if not server_id or server_id == "":
             # For now, hardcode a test server ID
             server_id = "test_server"
 
         # Check if player exists
         player = await Player.get_by_player_name(server_id, player_name)
-        if player is None:
+        if not player:
             embed = EmbedBuilder.error(
                 title="Player Not Found",
                 description=f"Player `{player_name}` not found on server `{server_id}`."
@@ -74,7 +74,7 @@ class PlayerLinksCog(commands.Cog):
 
         # Check if player is already linked to another Discord user
         existing_link = await PlayerLink.get_by_player_id(server_id, player.player_id)
-        if existing_link is not None and existing_link.discord_id != str(interaction.user.id):
+        if existing_link and existing_link.discord_id != str(interaction.user.id):
             embed = EmbedBuilder.warning(
                 title="Player Already Linked",
                 description=f"Player `{player_name}` is already linked to another Discord user."
@@ -123,14 +123,14 @@ class PlayerLinksCog(commands.Cog):
         """
         await interaction.response.defer(ephemeral=True)
 
-        # Get server ID from guild config if provided is None
-        if server_id is None or server_id == "":
+        # Get server ID from guild config if not provided
+        if not server_id or server_id == "":
             # For now, hardcode a test server ID
             server_id = "test_server"
 
         # Check if player exists
         player = await Player.get_by_player_name(server_id, player_name)
-        if player is None:
+        if not player:
             embed = EmbedBuilder.error(
                 title="Player Not Found",
                 description=f"Player `{player_name}` not found on server `{server_id}`."
@@ -140,7 +140,7 @@ class PlayerLinksCog(commands.Cog):
 
         # Check if link exists and belongs to this user
         link = await PlayerLink.get_by_player_id(server_id, player.player_id)
-        if link is None:
+        if not link:
             embed = EmbedBuilder.error(
                 title="No Link Found",
                 description=f"Player `{player_name}` is not linked to any Discord user."
@@ -160,7 +160,7 @@ class PlayerLinksCog(commands.Cog):
         success = await link.delete()
 
         # Update player Discord ID if successful
-        if success is not None:
+        if success:
             await player.set_discord_id(None)
 
             embed = EmbedBuilder.success(
@@ -194,15 +194,15 @@ class PlayerLinksCog(commands.Cog):
         """
         await interaction.response.defer(ephemeral=True)
 
-        # Get server ID from guild config if provided is None
-        if server_id is None or server_id == "":
+        # Get server ID from guild config if not provided
+        if not server_id or server_id == "":
             # For now, hardcode a test server ID
             server_id = "test_server"
 
         # Get linked players
         links = await PlayerLink.get_by_discord_id(server_id, str(interaction.user.id))
 
-        if links is None:
+        if not links:
             embed = EmbedBuilder.info(
                 title="No Linked Players",
                 description=f"You don't have any players linked on server `{server_id}`."
@@ -220,7 +220,7 @@ class PlayerLinksCog(commands.Cog):
         # Add player info
         for link in links:
             player = await Player.get_by_player_id(server_id, link.player_id)
-            if player is not None:
+            if player:
                 embed.add_field(
                     name=player.player_name,
                     value=f"Kills: {player.kills}\nDeaths: {player.deaths}\nK/D: {player.kd_ratio:.2f}",

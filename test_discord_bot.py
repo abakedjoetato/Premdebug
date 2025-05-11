@@ -112,7 +112,7 @@ async def test_csv_processor(bot, channel_id):
                 results.events_processed += len(events)
                 
                 # Log sample events for verification
-                if events:
+                if events is not None:
                     logger.info(f"Sample event: {events[0]}")
             except Exception as e:
                 error_msg = f"Error processing {file_path}: {str(e)}"

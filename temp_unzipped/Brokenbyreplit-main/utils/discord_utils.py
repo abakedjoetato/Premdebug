@@ -34,7 +34,7 @@ async def get_server_selection(ctx_or_interaction, guild_id: str, db=None):
     
     # Get the servers for this guild
     servers = guild_data.get("servers", [])
-    if not servers:
+    if servers is None:
         return []
     
     # Convert to list of (server_id, server_name) tuples
@@ -43,13 +43,13 @@ async def get_server_selection(ctx_or_interaction, guild_id: str, db=None):
         if isinstance(server, dict):
             server_id = server.get("server_id")
             server_name = server.get("server_name", "Unknown")
-            if server_id:
+            if server_id is not None:
                 server_options.append((server_id, server_name))
         # Handle string server IDs (legacy format)
         elif isinstance(server, str):
             # Try to get the server name from the server collection
             server_data = await db.db.servers.find_one({"server_id": server})
-            if server_data:
+            if server_data is not None:
                 server_name = server_data.get("server_name", "Unknown")
                 server_options.append((server, server_name))
             else:
@@ -78,7 +78,7 @@ async def server_id_autocomplete(interaction: discord.Interaction, current: str)
     
     # Get the guild ID
     guild_id = str(interaction.guild_id) if interaction.guild_id else None
-    if not guild_id:
+    if guild_id is None:
         return []
     
     # Get server options

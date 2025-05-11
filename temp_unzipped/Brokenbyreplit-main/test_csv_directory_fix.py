@@ -60,7 +60,7 @@ async def trigger_csv_processing():
         server_ids = await get_server_ids()
         logger.info(f"Found {len(server_ids)} servers to test")
         
-        if not server_ids:
+        if server_ids is None:
             logger.error("No server IDs found in database")
             return
             
@@ -78,7 +78,7 @@ async def trigger_csv_processing():
             result = await csv_processor.process_csv_files(server_id, historical=True, date_from=start_time)
             
             # Check the result
-            if not result or not isinstance(result, dict):
+            if not result if result is not None else \2, dict):
                 logger.warning(f"No results returned for server {server_id}")
                 continue
                 

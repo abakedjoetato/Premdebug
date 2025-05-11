@@ -154,7 +154,7 @@ class LogProcessorCog(commands.Cog):
             server_configs = await self._get_server_configs()
 
             # Skip processing if no SFTP-enabled servers are configured
-            if not server_configs:
+            if server_configs is None:
                 logger.debug("No SFTP-enabled servers configured, skipping log processing")
                 return
 
@@ -263,7 +263,7 @@ class LogProcessorCog(commands.Cog):
                 cursor = servers_cursor.find({"sftp_enabled": True})
                 servers_from_main = await cursor.to_list(length=100)
                 logger.info(f"Found {len(servers_from_main)} SFTP-enabled servers in servers collection")
-                if servers_from_main:
+                if servers_from_main is not None:
                     servers.extend(servers_from_main)
             except Exception as e:
                 logger.error(f"Error checking servers collection: {str(e)}")
@@ -289,7 +289,7 @@ class LogProcessorCog(commands.Cog):
 
                 # Add only servers that don't already exist in our list
                 unique_servers = [srv for srv in servers_from_game if srv.get('_id') not in existing_server_ids]
-                if unique_servers:
+                if unique_servers is not None:
                     logger.info(f"Adding {len(unique_servers)} unique servers from game_servers collection")
                     servers.extend(unique_servers)
                 else:
@@ -297,7 +297,7 @@ class LogProcessorCog(commands.Cog):
             except Exception as e:
                 logger.error(f"Error checking game_servers collection: {str(e)}")
 
-            if not servers:
+            if servers is None:
                 logger.warning("No servers with SFTP enabled found in either collection")
                 return {}
 
@@ -309,7 +309,7 @@ class LogProcessorCog(commands.Cog):
 
                 # Standardize the server ID for consistent handling
                 server_id = standardize_server_id(str(raw_server_id) if raw_server_id is not None else "")
-                if not server_id:
+                if server_id is None:
                     logger.warning(f"Invalid server ID format: {raw_server_id}, skipping")
                     continue
 
@@ -406,7 +406,7 @@ class LogProcessorCog(commands.Cog):
 
         try:
             # Create a new SFTP client for this server if not already existing
-            if server_id and server_id not in self.sftp_managers:
+            if server_id is not None and server_id not in self.sftp_managers:
                 logger.info(f"Creating new SFTPManager for server {server_id}")
 
                 # Import server_identity module for consistent ID resolution
@@ -424,7 +424,7 @@ class LogProcessorCog(commands.Cog):
                     original_server_id = config.get("original_server_id")
 
                     # Check if original_server_id is a UUID instead of numeric ID
-                    if original_server_id and not original_server_id.isdigit() and len(original_server_id) > 10:
+                    if original_server_id is not None and not original_server_id.isdigit() and len(original_server_id) > 10:
                         # Looks like a UUID - see if it's in KNOWN_SERVERS
                         if original_server_id in KNOWN_SERVERS:
                             mapped_id = KNOWN_SERVERS[original_server_id]
@@ -432,7 +432,7 @@ class LogProcessorCog(commands.Cog):
                             original_server_id = mapped_id
 
                     # If still no original_server_id, use the server_identity module
-                    if not original_server_id:
+                    if original_server_id is None:
                         # Get server properties for identification
                         server_name = config.get("server_name", "")
                         guild_id = config.get("guild_id")
@@ -461,7 +461,7 @@ class LogProcessorCog(commands.Cog):
                         logger.info(f"Extracted numeric ID '{original_server_id}' from hostname: {hostname}")
 
                 # Last resort: Fall back to UUID
-                if not original_server_id:
+                if original_server_id is None:
                     logger.warning(f"No numeric/original server ID found, using UUID as fallback: {server_id}")
                     original_server_id = server_id  # Fallback to UUID
 
@@ -530,14 +530,14 @@ class LogProcessorCog(commands.Cog):
                         try:
                             # Check servers collection for this server's entry
                             server_doc = await self.bot.db.servers.find_one({"_id": server_id})
-                            if server_doc and "original_server_id" in server_doc:
+                            if server_doc is not None and "original_server_id" in server_doc:
                                 path_server_id = server_doc["original_server_id"]
                                 logger.info(f"Found original server ID in database: {path_server_id}")
                         except Exception as db_err:
                             logger.warning(f"Error querying database for original server ID: {db_err}")
 
                     # Method 4: Try to extract from hostname
-                    if not path_server_id:
+                    if path_server_id is None:
                         hostname = config.get("hostname", "")
                         if "_" in hostname:
                             potential_id = hostname.split("_")[-1]
@@ -546,7 +546,7 @@ class LogProcessorCog(commands.Cog):
                                 logger.info(f"Extracted numeric ID from hostname: {potential_id}")
 
                     # Method 5: Try server name - look for numeric sequences
-                    if not path_server_id:
+                    if path_server_id is None:
                         server_name = config.get("server_name", "")
                         for word in str(server_name).split():
                             if word.isdigit() and len(word) >= 4:
@@ -555,7 +555,7 @@ class LogProcessorCog(commands.Cog):
                                 break
 
                     # Method 6: Look for numeric sequence in server ID itself
-                    if not path_server_id:
+                    if path_server_id is None:
                         # Try to extract numeric portion from UUID
                         id_str = str(server_id)
                         numeric_parts = re.findall(r'\d+', id_str)
@@ -568,7 +568,7 @@ class LogProcessorCog(commands.Cog):
                         try:
                             # Check if any server in the database has an original_server_id
                             server_docs = await self.bot.db.servers.find({"original_server_id": {"$exists": True}}).to_list(10)
-                            if server_docs and len(server_docs) > 0:
+                            if server_docs is not None and len(server_docs) > 0:
                                 # Use the first one we find
                                 path_server_id = server_docs[0].get("original_server_id")
                                 logger.info(f"Using original server ID from another server record: {path_server_id}")
@@ -576,7 +576,7 @@ class LogProcessorCog(commands.Cog):
                             logger.warning(f"Error querying database for servers with original_server_id: {db_err}")
 
                     # Final fallback - just use the server ID
-                    if not path_server_id:
+                    if path_server_id is None:
                         logger.warning(f"Could not find numeric server ID, using UUID as fallback: {server_id}")
                         path_server_id = server_id
 
@@ -596,7 +596,7 @@ class LogProcessorCog(commands.Cog):
 
                 # Ensure we have the correct numeric path for mapping to the SFTP path
                 original_server_id = config.get("original_server_id")
-                if original_server_id and not path_server_id:
+                if original_server_id is not None and not path_server_id:
                     path_server_id = original_server_id
                     logger.info(f"Using original_server_id from config: {original_server_id}")
 
@@ -695,7 +695,7 @@ class LogProcessorCog(commands.Cog):
                             elif hasattr(sftp.client, 'find_files_by_pattern'):
                                 result = await sftp.client.find_files_by_pattern("/", strict_pattern, recursive=True, max_depth=2)
 
-                            if result:
+                            if result is not None:
                                 # Only log the result count, not the full paths (reduce spam)
                                 logger.info(f"Found {len(result)} Deadside.log files through recursive search")
                                 log_files = [os.path.basename(result[0])]
@@ -902,12 +902,12 @@ class LogProcessorCog(commands.Cog):
         await interaction.response.defer(ephemeral=True)
 
         # Get server ID from guild config if not provided
-        if not server_id or server_id == "":
+        if server_id is None or server_id == "":
             try:
                 # Get server from guild ID
                 guild_id = str(interaction.guild_id)
                 server = await get_server(self.bot.db, guild_id)
-                if server:
+                if server is not None:
                     server_id = server["server_id"]
                 else:
                     # No hardcoded fallback, just show error to user
@@ -919,7 +919,7 @@ class LogProcessorCog(commands.Cog):
         # Get server config
         server_configs = await self._get_server_configs()
 
-        if not server_id or server_id not in server_configs:
+        if server_id is None or server_id not in server_configs:
             embed = await EmbedBuilder.create_error_embed(
                 title="Server Not Found",
                 description=f"No SFTP configuration found for server `{server_id}`."
@@ -1001,7 +1001,7 @@ class LogProcessorCog(commands.Cog):
 
             server_list.append(f"• `{server_id}` - Last processed: {last_time}")
 
-        if server_list:
+        if server_list is not None:
             embed.add_field(
                 name="Configured Servers",
                 value="\n".join(server_list),
@@ -1028,7 +1028,7 @@ class LogProcessorCog(commands.Cog):
         """
         try:
             server_id = event.get("server_id")
-            if not server_id or server_id == "":
+            if server_id is None or server_id == "":
                 logger.warning("Kill event missing server_id, skipping")
                 return False
 
@@ -1122,7 +1122,7 @@ class LogProcessorCog(commands.Cog):
         """
         try:
             server_id = event.get("server_id")
-            if not server_id or server_id == "":
+            if server_id is None or server_id == "":
                 logger.warning("Connection event missing server_id, skipping")
                 return False
 
@@ -1140,7 +1140,7 @@ class LogProcessorCog(commands.Cog):
                     timestamp = datetime.utcnow()
 
             # Check if we have the necessary player ID
-            if not player_id:
+            if player_id is None:
                 logger.warning("Connection event missing player_id, skipping")
                 return False
 
@@ -1179,7 +1179,7 @@ class LogProcessorCog(commands.Cog):
         """
         try:
             server_id = event.get("server_id")
-            if not server_id or server_id == "":
+            if server_id is None or server_id == "":
                 logger.warning("Game event missing server_id, skipping")
                 return False
 
@@ -1250,7 +1250,7 @@ class LogProcessorCog(commands.Cog):
             # Check if player exists
             player = await Player.get_by_player_id(self.bot.db, player_id)
 
-            if not player:
+            if player is None:
                 # Create new player
                 player = Player(
                     player_id=player_id,

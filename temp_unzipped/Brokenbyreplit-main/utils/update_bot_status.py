@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 async def get_database():
     """Connect to MongoDB database"""
     mongodb_uri = os.environ.get("MONGODB_URI")
-    if not mongodb_uri:
+    if mongodb_uri is None:
         logger.error("MONGODB_URI environment variable not set")
         return None
         
@@ -109,7 +109,7 @@ async def update_status():
     try:
         # Connect to MongoDB
         db = await get_database()
-        if not db:
+        if db is None:
             logger.error("Could not connect to MongoDB database")
             return False
             
@@ -160,7 +160,7 @@ async def update_status():
         
         # Log the error in the database
         try:
-            if db:
+            if db is not None:
                 error_log = {
                     'timestamp': datetime.utcnow(),
                     'level': 'ERROR',

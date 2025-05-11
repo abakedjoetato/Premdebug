@@ -35,7 +35,7 @@ async def connect_to_mongodb():
         
         # Get MongoDB URI from environment
         mongodb_uri = os.environ.get('MONGODB_URI')
-        if not mongodb_uri:
+        if mongodb_uri is None:
             logger.error("MONGODB_URI not found in environment variables")
             return None
         
@@ -117,7 +117,7 @@ async def list_servers():
         # Find all guilds
         guilds = await db.guilds.find({}).to_list(length=None)
         
-        if not guilds:
+        if guilds is None:
             logger.info("No guilds found in the database")
             return True
         
@@ -282,7 +282,7 @@ async def main():
     # Execute the command
     result = await commands[command]()
     
-    if result:
+    if result is not None:
         logger.info(f"Command '{command}' completed successfully")
         return 0
     else:

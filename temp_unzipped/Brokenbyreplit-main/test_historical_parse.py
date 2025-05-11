@@ -55,7 +55,7 @@ async def run_historical_parse():
         )
         
         # Log the result
-        if result:
+        if result is not None:
             logger.info(f"Historical parsing completed successfully: {result}")
         else:
             logger.error("Historical parsing failed")

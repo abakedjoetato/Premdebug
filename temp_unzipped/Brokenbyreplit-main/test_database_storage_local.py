@@ -59,7 +59,7 @@ async def test_storage():
             total_processed += len(events)
             
             # Store events in memory
-            if events:
+            if events is not None:
                 # Mark events as test imports
                 for event in events:
                     event["test_import"] = True
@@ -73,7 +73,7 @@ async def test_storage():
                 total_stored += stored_count
                 
                 # Verify events were stored
-                if events:
+                if events is not None:
                     logger.info(f"Sample stored event: {events[0]}")
                     
         except Exception as e:

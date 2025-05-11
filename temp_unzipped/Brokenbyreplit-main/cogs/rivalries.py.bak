@@ -13,8 +13,8 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any, Union, Literal
 
 import discord
-from discord import app_commands
 from discord.ext import commands
+from discord import app_commands
 
 from models.rivalry import Rivalry
 from models.player_link import PlayerLink
@@ -51,11 +51,11 @@ class RivalriesCog(commands.Cog):
             server_id: Server ID
 
         Returns:
-            str or None: Player ID if found is not None
+            str or None: Player ID if found
         """
-        # Check if user is not None has a player link
+        # Check if user has a player link
         player_link = await PlayerLink.get_by_discord_id(interaction.user.id)
-        if player_link is None:
+        if not player_link:
             # No player link found, inform user
             embed = EmbedBuilder.warning(
                 title="No Linked Player",
@@ -64,9 +64,9 @@ class RivalriesCog(commands.Cog):
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return None
 
-        # Check if user is not None has a player on this server
+        # Check if user has a player on this server
         player_id = player_link.get_player_id_for_server(server_id)
-        if player_id is None or player_id == "":
+        if not player_id or player_id == "":
             # No player on this server, inform user
             embed = EmbedBuilder.warning(
                 title="No Player on Server",
@@ -89,7 +89,7 @@ class RivalriesCog(commands.Cog):
         
         # Check premium tier for guild
         guild = await Guild.get_guild(self.bot.db, interaction.guild_id)
-        if guild is None or not guild.check_feature_access("rivalries"):
+        if not guild or not guild.check_feature_access("rivalries"):
             embed = EmbedBuilder.create_error_embed(
                 "Premium Feature",
                 "Rivalries are a premium feature (Tier 3+). Please upgrade to access this feature."
@@ -101,10 +101,10 @@ class RivalriesCog(commands.Cog):
         server_id = None
         
         # Get server ID from guild config
-        if server_id is None or server_id == "":
+        if not server_id or server_id == "":
             # Get the first server ID from guild configuration
             server = await Server.get_first_for_guild(self.bot.db, guild.id)
-            if server is None:
+            if not server:
                 embed = EmbedBuilder.create_error_embed(
                     "No Server Configured",
                     "You don't have any game servers configured for this Discord server. Use `/setup server add` to add a server first."
@@ -115,7 +115,7 @@ class RivalriesCog(commands.Cog):
 
         # Get user's player link
         player_link = await PlayerLink.get_by_discord_id(member.id)
-        if player_link is None:
+        if not player_link:
             embed = EmbedBuilder.info(
                 title="No Rivalries",
                 description=f"{member.display_name} doesn't have any linked players or rivalries."
@@ -125,7 +125,7 @@ class RivalriesCog(commands.Cog):
 
         # Get player ID for server
         player_id = player_link.get_player_id_for_server(server_id)
-        if player_id is None or player_id == "":
+        if not player_id or player_id == "":
             embed = EmbedBuilder.info(
                 title="No Rivalries",
                 description=f"{member.display_name} doesn't have a linked player on this server."
@@ -136,7 +136,7 @@ class RivalriesCog(commands.Cog):
         # Get player's rivalries
         rivalries = await Rivalry.get_for_player(server_id, player_id)
 
-        if rivalries is None or len(rivalries) == 0:
+        if not rivalries or len(rivalries) == 0:
             embed = EmbedBuilder.info(
                 title="No Rivalries",
                 description=f"{member.display_name} doesn't have any rivalries yet."
@@ -203,11 +203,11 @@ class RivalriesCog(commands.Cog):
         """
         await interaction.response.defer()
 
-        # Get server ID from guild config if provided is None
-        if server_id is None or server_id == "":
+        # Get server ID from guild config if not provided
+        if not server_id or server_id == "":
             # Get guild configuration
             guild = await Guild.get_guild(self.bot.db, interaction.guild_id)
-            if guild is None:
+            if not guild:
                 embed = EmbedBuilder.create_error_embed(
                     "Guild Not Found",
                     "Could not find guild configuration. Please contact an administrator."
@@ -217,7 +217,7 @@ class RivalriesCog(commands.Cog):
                 
             # Get the first server ID from guild configuration
             server = await Server.get_first_for_guild(self.bot.db, guild.id)
-            if server is None:
+            if not server:
                 embed = EmbedBuilder.create_error_embed(
                     "No Server Configured",
                     "You don't have any game servers configured for this Discord server. Use `/setup server add` to add a server first."
@@ -228,13 +228,13 @@ class RivalriesCog(commands.Cog):
 
         # Get player ID for server
         player_id = await self.get_player_id_for_server(interaction, server_id)
-        if player_id is None or player_id == "":
+        if not player_id or player_id == "":
             return
 
         # Get player's rivalries
         rivalries = await Rivalry.get_for_player(server_id, player_id)
 
-        if rivalries is None or len(rivalries) == 0:
+        if not rivalries or len(rivalries) == 0:
             embed = EmbedBuilder.info(
                 title="No Rivalries",
                 description="You don't have any rivalries yet. Play more and engage with other players!"
@@ -301,11 +301,11 @@ class RivalriesCog(commands.Cog):
         """
         await interaction.response.defer()
 
-        # Get server ID from guild config if provided is None
-        if server_id is None or server_id == "":
+        # Get server ID from guild config if not provided
+        if not server_id or server_id == "":
             # Get guild configuration
             guild = await Guild.get_guild(self.bot.db, interaction.guild_id)
-            if guild is None:
+            if not guild:
                 embed = EmbedBuilder.create_error_embed(
                     "Guild Not Found",
                     "Could not find guild configuration. Please contact an administrator."
@@ -315,7 +315,7 @@ class RivalriesCog(commands.Cog):
                 
             # Get the first server ID from guild configuration
             server = await Server.get_first_for_guild(self.bot.db, guild.id)
-            if server is None:
+            if not server:
                 embed = EmbedBuilder.create_error_embed(
                     "No Server Configured",
                     "You don't have any game servers configured for this Discord server. Use `/setup server add` to add a server first."
@@ -331,7 +331,7 @@ class RivalriesCog(commands.Cog):
         # Get player's rivalries
         rivalries = await Rivalry.get_for_player(server_id, player_id)
 
-        if rivalries is None or len(rivalries) == 0:
+        if not rivalries or len(rivalries) == 0:
             embed = EmbedBuilder.info(
                 title="No Rivalries",
                 description=f"Player `{player_name}` doesn't have any rivalries yet."
@@ -384,7 +384,7 @@ class RivalriesCog(commands.Cog):
                 # Skip rivalries where player isn't part of it
                 continue
 
-        if embeds is None or len(embeds) == 0:
+        if not embeds or len(embeds) == 0:
             embed = EmbedBuilder.info(
                 title="No Rivalries",
                 description=f"Player `{player_name}` doesn't have any valid rivalries."
@@ -421,11 +421,11 @@ class RivalriesCog(commands.Cog):
         """
         await interaction.response.defer()
 
-        # Get server ID from guild config if provided is None
-        if server_id is None or server_id == "":
+        # Get server ID from guild config if not provided
+        if not server_id or server_id == "":
             # Get guild configuration
             guild = await Guild.get_guild(self.bot.db, interaction.guild_id)
-            if guild is None:
+            if not guild:
                 embed = EmbedBuilder.create_error_embed(
                     "Guild Not Found",
                     "Could not find guild configuration. Please contact an administrator."
@@ -435,7 +435,7 @@ class RivalriesCog(commands.Cog):
                 
             # Get the first server ID from guild configuration
             server = await Server.get_first_for_guild(self.bot.db, guild.id)
-            if server is None:
+            if not server:
                 embed = EmbedBuilder.create_error_embed(
                     "No Server Configured",
                     "You don't have any game servers configured for this Discord server. Use `/setup server add` to add a server first."
@@ -447,7 +447,7 @@ class RivalriesCog(commands.Cog):
         # Get top rivalries
         rivalries = await Rivalry.get_top_rivalries(server_id, limit)
 
-        if rivalries is None or len(rivalries) == 0:
+        if not rivalries or len(rivalries) == 0:
             embed = EmbedBuilder.info(
                 title="No Rivalries",
                 description=f"There are no rivalries on server `{server_id}` yet."
@@ -500,11 +500,11 @@ class RivalriesCog(commands.Cog):
         """
         await interaction.response.defer()
 
-        # Get server ID from guild config if provided is None
-        if server_id is None or server_id == "":
+        # Get server ID from guild config if not provided
+        if not server_id or server_id == "":
             # Get guild configuration
             guild = await Guild.get_guild(self.bot.db, interaction.guild_id)
-            if guild is None:
+            if not guild:
                 embed = EmbedBuilder.create_error_embed(
                     "Guild Not Found",
                     "Could not find guild configuration. Please contact an administrator."
@@ -514,7 +514,7 @@ class RivalriesCog(commands.Cog):
                 
             # Get the first server ID from guild configuration
             server = await Server.get_first_for_guild(self.bot.db, guild.id)
-            if server is None:
+            if not server:
                 embed = EmbedBuilder.create_error_embed(
                     "No Server Configured",
                     "You don't have any game servers configured for this Discord server. Use `/setup server add` to add a server first."
@@ -526,7 +526,7 @@ class RivalriesCog(commands.Cog):
         # Get closest rivalries
         rivalries = await Rivalry.get_closest_rivalries(server_id, limit)
 
-        if rivalries is None or len(rivalries) == 0:
+        if not rivalries or len(rivalries) == 0:
             embed = EmbedBuilder.info(
                 title="No Rivalries",
                 description=f"There are no rivalries on server `{server_id}` yet."
@@ -582,11 +582,11 @@ class RivalriesCog(commands.Cog):
         """
         await interaction.response.defer()
 
-        # Get server ID from guild config if provided is None
-        if server_id is None or server_id == "":
+        # Get server ID from guild config if not provided
+        if not server_id or server_id == "":
             # Get guild configuration
             guild = await Guild.get_guild(self.bot.db, interaction.guild_id)
-            if guild is None:
+            if not guild:
                 embed = EmbedBuilder.create_error_embed(
                     "Guild Not Found",
                     "Could not find guild configuration. Please contact an administrator."
@@ -596,7 +596,7 @@ class RivalriesCog(commands.Cog):
                 
             # Get the first server ID from guild configuration
             server = await Server.get_first_for_guild(self.bot.db, guild.id)
-            if server is None:
+            if not server:
                 embed = EmbedBuilder.create_error_embed(
                     "No Server Configured",
                     "You don't have any game servers configured for this Discord server. Use `/setup server add` to add a server first."
@@ -608,7 +608,7 @@ class RivalriesCog(commands.Cog):
         # Get recent rivalries
         rivalries = await Rivalry.get_recent_rivalries(server_id, limit, days)
 
-        if rivalries is None or len(rivalries) == 0:
+        if not rivalries or len(rivalries) == 0:
             embed = EmbedBuilder.info(
                 title="No Recent Rivalries",
                 description=f"There are no rivalries active in the last {days} days on server `{server_id}`."
@@ -664,11 +664,11 @@ class RivalriesCog(commands.Cog):
         """
         await interaction.response.defer()
 
-        # Get server ID from guild config if provided is None
-        if server_id is None or server_id == "":
+        # Get server ID from guild config if not provided
+        if not server_id or server_id == "":
             # Get guild configuration
             guild = await Guild.get_guild(self.bot.db, interaction.guild_id)
-            if guild is None:
+            if not guild:
                 embed = EmbedBuilder.create_error_embed(
                     "Guild Not Found",
                     "Could not find guild configuration. Please contact an administrator."
@@ -678,7 +678,7 @@ class RivalriesCog(commands.Cog):
                 
             # Get the first server ID from guild configuration
             server = await Server.get_first_for_guild(self.bot.db, guild.id)
-            if server is None:
+            if not server:
                 embed = EmbedBuilder.create_error_embed(
                     "No Server Configured",
                     "You don't have any game servers configured for this Discord server. Use `/setup server add` to add a server first."
@@ -688,7 +688,7 @@ class RivalriesCog(commands.Cog):
             server_id = server.server_id
 
         # Validate player names
-        if player1 is None or player2 is None or player1 == "" or player2 == "":
+        if not player1 or not player2 or player1 == "" or player2 == "":
             embed = EmbedBuilder.error(
                 title="Missing Players",
                 description="Please specify both player names."
@@ -704,7 +704,7 @@ class RivalriesCog(commands.Cog):
         # Get rivalry between players
         rivalry = await Rivalry.get_by_players(server_id, player1_id, player2_id)
 
-        if rivalry is None:
+        if not rivalry:
             embed = EmbedBuilder.info(
                 title="No Rivalry",
                 description=f"There is no rivalry between `{player1}` and `{player2}` on server `{server_id}`."
@@ -760,7 +760,7 @@ class RivalriesCog(commands.Cog):
 
         # Check premium tier for guild
         guild = await Guild.get_guild(self.bot.db, interaction.guild_id)
-        if guild is None or not guild.check_feature_access("rivalries"):
+        if not guild or not guild.check_feature_access("rivalries"):
             embed = EmbedBuilder.create_error_embed(
                 "Premium Feature",
                 "Rivalries are a premium feature (Tier 3+). Please upgrade to access this feature."
@@ -770,7 +770,7 @@ class RivalriesCog(commands.Cog):
 
         # Check admin permissions
         admin_permission = has_admin_permission(interaction)
-        if admin_permission is None or admin_permission is False:
+        if not admin_permission:
             embed = EmbedBuilder.error(
                 title="Permission Denied",
                 description="You don't have permission to use this command."
@@ -801,14 +801,14 @@ class RivalriesCog(commands.Cog):
         )
 
         # Add details
-        if weapon is not None:
+        if weapon:
             embed.add_field(
                 name="Weapon",
                 value=weapon,
                 inline=True
             )
 
-        if location is not None:
+        if location:
             embed.add_field(
                 name="Location",
                 value=location,

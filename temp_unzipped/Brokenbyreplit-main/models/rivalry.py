@@ -175,7 +175,7 @@ class Rivalry(BaseModel):
         }
 
         # Add server_id if provided
-        if server_id:
+        if server_id is not None:
             query["server_id"] = server_id
 
         # Find rivalries
@@ -257,7 +257,7 @@ class Rivalry(BaseModel):
         }
 
         # Update kill counts
-        if is_player1_killer:
+        if is_player1_killer is not None:
             data["player1_kills"] = self.data.get("player1_kills", 0) + 1
 
             # Update headshot count if applicable

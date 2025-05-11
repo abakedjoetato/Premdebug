@@ -1,0 +1,301 @@
+
+#!/usr/bin/env python3
+"""
+Comprehensive fix for map directory file tracking in CSV processor
+
+This script addresses the issue where files found in map directories 
+are not being properly added to tracking lists for processing.
+"""
+import logging
+import os
+import asyncio
+from datetime import datetime
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler("map_directory_fix.log")
+    ]
+)
+
+logger = logging.getLogger("map_directory_fix")
+
+async def connect_to_db():
+    """Connect to the MongoDB database"""
+    try:
+        from utils.database import initialize_db
+        db = await initialize_db()
+        logger.info("Connected to MongoDB database")
+        return db
+    except Exception as e:
+        logger.error(f"Failed to connect to database: {e}")
+        return None
+
+async def apply_fixes_to_csv_processor():
+    """Apply fixes to the CSV processor module"""
+    csp_path = "cogs/csv_processor.py"
+    
+    # Read the current content
+    try:
+        with open(csp_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            logger.info(f"Successfully read {csp_path}")
+    except Exception as e:
+        logger.error(f"Failed to read {csp_path}: {e}")
+        return False
+    
+    # Create a backup
+    backup_path = f"{csp_path}.map_tracking.bak"
+    try:
+        with open(backup_path, 'w', encoding='utf-8') as f:
+            f.write(content)
+            logger.info(f"Created backup at {backup_path}")
+    except Exception as e:
+        logger.error(f"Failed to create backup: {e}")
+        return False
+    
+    # Apply fixes
+    
+    # Fix 1: Ensure map files are properly added to tracking lists
+    map_files_fix = """
+                                        # CRITICAL FIX: Properly track map files found
+                                        if map_csv_files:
+                                            logger.warning(f"Found {len(map_csv_files)} CSV files in map directory {map_dir}")
+                                            
+                                            # Convert to full paths
+                                            map_full_paths = [
+                                                os.path.join(map_dir, f) for f in map_csv_files
+                                                if not f.startswith('/')  # Only relative paths need joining
+                                            ]
+                                            
+                                            # Add to the lists in multiple places to ensure redundancy
+                                            if not hasattr(self, 'all_map_csv_files'):
+                                                self.all_map_csv_files = []
+                                            self.all_map_csv_files.extend(map_full_paths)
+                                            
+                                            # Also add to map_csv_files_found list
+                                            if not hasattr(self, 'map_csv_files_found'):
+                                                self.map_csv_files_found = []
+                                            self.map_csv_files_found.extend(map_csv_files)
+                                            
+                                            # Also add to map_csv_full_paths_found list
+                                            if not hasattr(self, 'map_csv_full_paths_found'):
+                                                self.map_csv_full_paths_found = []
+                                            self.map_csv_full_paths_found.extend(map_full_paths)
+                                            
+                                            # Set flag to ensure we properly track that we've found map files
+                                            self.found_map_files = True
+                                            
+                                            # Log detailed information for debugging
+                                            logger.warning(f"Added {len(map_full_paths)} CSV files from map directory {map_dir} to tracking lists")
+                                            logger.warning(f"Total tracked map files now: {len(self.all_map_csv_files)}")
+"""
+    
+    old_map_files_code = """                                        if map_csv_files:
+                                            # CRITICAL FIX: Prioritize map directory files when found
+                                            # This prevents them from being overwritten by other searches
+                                            log_msg = f"Found {len(map_csv_files)} CSV files in map directory {map_dir}"
+                                            logger.info(log_msg)
+                                            
+                                            # Store this log message for potential recovery
+                                            self.recent_log_lines.append(log_msg)
+                                            
+                                            # Update our tracking counter for this run
+                                            total_map_files_found += len(map_csv_files)
+                                            
+                                            # Convert to full paths
+                                            map_full_paths = [
+                                                os.path.join(map_dir, f) for f in map_csv_files
+                                                if not f.startswith('/')  # Only relative paths need joining
+                                            ]
+                                            
+                                            # Add to the lists in multiple places to ensure redundancy
+                                            if not hasattr(self, 'all_map_csv_files'):
+                                                self.all_map_csv_files = []
+                                            self.all_map_csv_files.extend(map_full_paths)
+                                            
+                                            # Also add to a backup list
+                                            if not hasattr(self, 'map_csv_files_found'):
+                                                self.map_csv_files_found = []
+                                            self.map_csv_files_found.extend(map_csv_files)
+                                            
+                                            # Ensure we have a class property tracking the count too
+                                            if not hasattr(self, 'total_map_files_found'):
+                                                self.total_map_files_found = 0
+                                            self.total_map_files_found = len(self.all_map_csv_files)
+                                            
+                                            # Set this flag to ensure we properly track that we've found map files
+                                            if not hasattr(self, 'found_map_files'):
+                                                self.found_map_files = False
+                                            self.found_map_files = True
+                                            
+                                            # Log detailed information for debugging
+                                            logger.info(f"Added {len(map_full_paths)} CSV files from map directory {map_dir} to tracking lists")
+                                            logger.info(f"Total tracked map files now: {len(self.all_map_csv_files)}")"""
+    
+    # Fix 2: Fix the assignment of files_to_process
+    files_to_process_fix = """
+                            # If we found files in map directories, store them for processing
+                            if csv_files and len(csv_files) > 0:
+                                logger.warning(f"Successfully found {len(csv_files)} CSV files in map directories, will process these files")
+                                self.map_csv_files_found = csv_files.copy()
+                                self.map_csv_full_paths_found = full_path_csv_files.copy()
+                                # CRITICAL FIX: Ensure we set files_to_process to the full paths we found
+                                self.files_to_process = self.map_csv_full_paths_found
+                                # Set flag to track that we found files
+                                self.found_map_files = True
+                                # Update processing status to avoid misleading logs
+                                logger.warning(f"Found {len(self.map_csv_files_found)} CSV files in map directories, saving to files_to_process")
+"""
+
+    old_files_to_process_code = """                            # If we found files in map directories, store them for later processing
+                            if csv_files and len(csv_files) > 0:
+                                logger.info(f"Successfully found {len(csv_files)} CSV files in map directories, will process these files")
+                                self.map_csv_files_found = csv_files.copy()
+                                self.map_csv_full_paths_found = full_path_csv_files.copy()
+                                # Set these variables to ensure we process the files we found
+                                self.files_to_process = self.map_csv_full_paths_found
+                                # Set flag to track that we found files
+                                self.found_map_files = True
+                                # Update processing status to avoid misleading logs
+                                if not hasattr(self, 'found_csv_files_status_updated'):
+                                    self.found_csv_files_status_updated = True
+                                # We'll still continue with additional search to ensure no files are missed
+                                logger.info(f"Found {len(self.map_csv_files_found)} CSV files in map directories, continuing with additional search to find more files if available")"""
+    
+    # Fix 3: Fix files_to_process assignment in historical mode
+    historical_fix = """                            # CRITICAL FIX: For historical mode, ensure we include ALL files
+                            if is_historical_mode:
+                                logger.warning(f"CSV Processing: Historical mode - will process ALL files from map directories")
+                                if hasattr(self, 'map_csv_full_paths_found') and self.map_csv_full_paths_found:
+                                    files_to_process = self.map_csv_full_paths_found
+                                    logger.warning(f"CSV Processing: Using {len(files_to_process)} files from map directories for historical processing")
+"""
+    
+    # Fix 4: Ensure we log success correctly
+    success_fix = """                            total_files_found = files_found + map_files_count
+                            logger.warning(f"CSV Processing: Final files found count = {total_files_found} (normal files: {files_found}, map files: {map_files_count})")
+                            logger.warning(f"CSV Processing: Files processed: {files_count}, Events processed: {events_count}")
+"""
+    
+    # Apply the fixes
+    try:
+        # Fix 1
+        if old_map_files_code in content:
+            content = content.replace(old_map_files_code, map_files_fix)
+            logger.info("Applied Fix 1: Map files tracking fix")
+        else:
+            logger.warning("Fix 1: Could not find target code section for map files fix")
+        
+        # Fix 2
+        if old_files_to_process_code in content:
+            content = content.replace(old_files_to_process_code, files_to_process_fix)
+            logger.info("Applied Fix 2: Files to process assignment fix")
+        else:
+            logger.warning("Fix 2: Could not find target code section for files_to_process fix")
+        
+        # Fix 3: Insert historical fix at the appropriate location - using a marker
+        marker = "logger.info(f\"CSV Processing: Mode: Historical={is_historical_mode}, Only new lines={only_new_lines}\")"
+        if marker in content:
+            content = content.replace(marker, marker + "\n" + historical_fix)
+            logger.info("Applied Fix 3: Historical mode file assignment fix")
+        else:
+            logger.warning("Fix 3: Could not find target marker for historical mode fix")
+        
+        # Fix 4: Add enhanced success logging
+        marker = "logger.warning(f\"DEBUG: Final total_found = {total_found} (files_found={files_found} + map_files_count={map_files_count})\")"
+        if marker in content:
+            content = content.replace(marker, success_fix)
+            logger.info("Applied Fix 4: Success logging fix")
+        else:
+            logger.warning("Fix 4: Could not find target marker for success logging fix")
+        
+        # Write the modified content
+        with open(csp_path, 'w', encoding='utf-8') as f:
+            f.write(content)
+            logger.info(f"Successfully wrote fixes to {csp_path}")
+        
+        return True
+    except Exception as e:
+        logger.error(f"Failed to apply fixes: {e}")
+        return False
+
+async def reset_historical_flags(db):
+    """Reset historical parse flags to ensure proper processing"""
+    try:
+        logger.info("Resetting historical parse flags...")
+        
+        # Update all servers
+        result = await db.servers.update_many(
+            {},
+            {"$set": {"historical_parse_done": False}}
+        )
+        
+        logger.info(f"Reset historical_parse_done flag for {result.modified_count} servers")
+        return True
+    except Exception as e:
+        logger.error(f"Error resetting historical flags: {e}")
+        return False
+
+async def fix_database_tracking(db):
+    """Update the database file position tracking"""
+    try:
+        # Clear file positions collection
+        if "file_positions" in await db.list_collection_names():
+            result = await db.file_positions.delete_many({})
+            logger.info(f"Cleared {result.deleted_count} file position records")
+        else:
+            # Create file_positions collection if it doesn't exist
+            await db.create_collection("file_positions")
+            logger.info("Created file_positions collection")
+        
+        return True
+    except Exception as e:
+        logger.error(f"Error fixing database tracking: {e}")
+        return False
+
+async def main():
+    """Main function to apply all fixes"""
+    logger.info("Starting map directory tracking fix")
+    
+    # Connect to database
+    db = await connect_to_db()
+    if not db:
+        logger.error("Failed to connect to database, exiting")
+        return False
+    
+    try:
+        # Apply code fixes
+        code_fix_result = await apply_fixes_to_csv_processor()
+        
+        # Fix database tracking
+        if db:
+            db_fix_result = await fix_database_tracking(db)
+            historical_reset = await reset_historical_flags(db)
+        else:
+            db_fix_result = False
+            historical_reset = False
+        
+        # Log results
+        if code_fix_result and db_fix_result and historical_reset:
+            logger.info("All fixes applied successfully!")
+        else:
+            logger.warning("Some fixes were not applied successfully")
+            logger.warning(f"Code fixes: {code_fix_result}, DB fixes: {db_fix_result}, Historical reset: {historical_reset}")
+        
+        return code_fix_result and db_fix_result and historical_reset
+    except Exception as e:
+        logger.error(f"Error during fix application: {e}")
+        return False
+    finally:
+        # Close database connection
+        if db and hasattr(db, 'client') and hasattr(db.client, 'close'):
+            await db.client.close()
+            logger.info("Closed database connection")
+
+if __name__ == "__main__":
+    success = asyncio.run(main())
+    exit(0 if success else 1)

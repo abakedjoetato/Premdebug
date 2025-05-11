@@ -45,7 +45,7 @@ class Events(commands.Cog):
             guild_model = None
             try:
                 guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
-                if guild_data:
+                if guild_data is not None:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
             except Exception as e:
@@ -126,7 +126,7 @@ class Events(commands.Cog):
             guild_model = None
             try:
                 guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
-                if guild_data:
+                if guild_data is not None:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
             except Exception as e:
@@ -138,7 +138,7 @@ class Events(commands.Cog):
 
             # Get guild data
             guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
-            if not guild_data:
+            if guild_data is None:
                 embed = await EmbedBuilder.create_error_embed(
                     "Error",
                     "This guild is not set up. Please use the setup commands first.",
@@ -155,7 +155,7 @@ class Events(commands.Cog):
                     server_exists = True
                     break
 
-            if not server_exists:
+            if server_exists is None:
                 embed = await EmbedBuilder.create_error_embed(
                     "Error",
                     f"Server '{server_id}' not found in this guild. Please use an existing server name.",
@@ -233,7 +233,7 @@ class Events(commands.Cog):
             guild_model = None
             try:
                 guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
-                if guild_data:
+                if guild_data is not None:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
             except Exception as e:
@@ -289,7 +289,7 @@ class Events(commands.Cog):
             guild_model = None
             try:
                 guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
-                if guild_data:
+                if guild_data is not None:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
             except Exception as e:
@@ -297,7 +297,7 @@ class Events(commands.Cog):
 
             # Get guild data
             guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
-            if not guild_data:
+            if guild_data is None:
                 embed = await EmbedBuilder.create_error_embed(
                     "Error",
                     "This guild is not set up. Please use the setup commands first.",
@@ -400,7 +400,7 @@ class Events(commands.Cog):
             guild_model = None
             try:
                 guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
-                if guild_data:
+                if guild_data is not None:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
             except Exception as e:
@@ -414,7 +414,7 @@ class Events(commands.Cog):
 
             # Get guild data
             guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
-            if not guild_data:
+            if guild_data is None:
                 embed = await EmbedBuilder.create_error_embed(
                     "Error",
                     "This guild is not set up. Please use the setup commands first.",
@@ -443,7 +443,7 @@ class Events(commands.Cog):
                     server_name = s.get("server_name", server_id)
                     break
 
-            if not server:
+            if server is None:
                 embed = await EmbedBuilder.create_error_embed(
                     "Server Not Found",
                     f"Server '{server_id}' not found in this guild. Please use an existing server name.",
@@ -458,7 +458,7 @@ class Events(commands.Cog):
             else:
                 events = await Event.get_by_server(self.bot.db, server_id, limit, event_type)
 
-            if not events or len(events) == 0:
+            if events is None or len(events) == 0:
                 embed = await EmbedBuilder.create_error_embed(
                     "No Events",
                     f"No events found for server {server_name}" +
@@ -530,7 +530,7 @@ class Events(commands.Cog):
             guild_model = None
             try:
                 guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
-                if guild_data:
+                if guild_data is not None:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
             except Exception as e:
@@ -538,7 +538,7 @@ class Events(commands.Cog):
 
             # Get guild data
             guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
-            if not guild_data:
+            if guild_data is None:
                 embed = await EmbedBuilder.create_error_embed(
                     "Error",
                     "This guild is not set up. Please use the setup commands first.",
@@ -567,7 +567,7 @@ class Events(commands.Cog):
                     server_name = s.get("server_name", server_id)
                     break
 
-            if not server:
+            if server is None:
                 embed = await EmbedBuilder.create_error_embed(
                     "Server Not Found",
                     f"Server '{server_id}' not found in this guild. Please use an existing server name.",
@@ -644,7 +644,7 @@ class Events(commands.Cog):
             guild_model = None
             try:
                 guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
-                if guild_data:
+                if guild_data is not None:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
             except Exception as e:
@@ -656,7 +656,7 @@ class Events(commands.Cog):
 
             # Get server
             server = await Server.get_by_id(self.bot.db, server_id, ctx.guild.id)
-            if not server:
+            if server is None:
                 embed = await EmbedBuilder.create_error_embed(
                     "Error",
                     f"Could not find server with ID {server_id} for this guild.",
@@ -679,7 +679,7 @@ class Events(commands.Cog):
                 settings["convoy"] = convoy
             if encounter:
                 settings["encounter"] = encounter
-            if server_restart:
+            if server_restart is not None:
                 settings["server_restart"] = server_restart
 
             # If no settings were provided, show current settings
@@ -770,7 +770,7 @@ class Events(commands.Cog):
             guild_model = None
             try:
                 guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
-                if guild_data:
+                if guild_data is not None:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
             except Exception as e:
@@ -782,7 +782,7 @@ class Events(commands.Cog):
 
             # Get server
             server = await Server.get_by_id(self.bot.db, server_id, ctx.guild.id)
-            if not server:
+            if server is None:
                 embed = await EmbedBuilder.create_error_embed(
                     "Error",
                     f"Could not find server with ID {server_id} for this guild.",
@@ -887,7 +887,7 @@ class Events(commands.Cog):
             guild_model = None
             try:
                 guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
-                if guild_data:
+                if guild_data is not None:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
             except Exception as e:
@@ -899,7 +899,7 @@ class Events(commands.Cog):
 
             # Get server
             server = await Server.get_by_id(self.bot.db, server_id, ctx.guild.id)
-            if not server:
+            if server is None:
                 embed = await EmbedBuilder.create_error_embed(
                     "Error",
                     f"Could not find server with ID {server_id} for this guild.",
@@ -1031,7 +1031,7 @@ class Events(commands.Cog):
                     try:
                         guild_data = await self.bot.db.guilds.find_one({"servers.server_id": server_id})
                         guild_model = None
-                        if guild_data:
+                        if guild_data is not None:
                             # Use create_from_db_document to ensure proper conversion of premium_tier
                             guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
 
@@ -1078,7 +1078,7 @@ async def start_events_monitor(bot, guild_id: int, server_id: str):
 
     # Check if guild exists in bot's cache
     discord_guild = bot.get_guild(int(guild_id))
-    if not discord_guild:
+    if discord_guild is None:
         logger.error(f"Guild {guild_id} not found in bot's cache - will continue processing data without sending Discord messages")
         # Don't return here, we'll still process data for when the guild is available later
 
@@ -1087,14 +1087,14 @@ async def start_events_monitor(bot, guild_id: int, server_id: str):
     try:
         # Get server data
         server = await Server.get_by_id(bot.db, server_id, guild_id)
-        if not server:
+        if server is None:
             logger.error(f"Server {server_id} not found in guild {guild_id}")
             return
 
         # Verify channel configuration
         events_channel_id = server.events_channel_id
         channel_configured = True
-        if not events_channel_id:
+        if events_channel_id is None:
             logger.warning(f"No events channel configured for server {server_id} in guild {guild_id}")
 
             # Send a direct message to administrators about missing configuration
@@ -1189,7 +1189,7 @@ async def start_events_monitor(bot, guild_id: int, server_id: str):
 
         # Get channels
         guild = bot.get_guild(guild_id)
-        if not guild:
+        if guild is None:
             logger.error(f"Guild {guild_id} not found - will continue processing data without sending Discord messages")
             # Don't return here, we'll still process data for when the guild is available later
 
@@ -1216,7 +1216,7 @@ async def start_events_monitor(bot, guild_id: int, server_id: str):
                     events_channel = guild.get_channel(events_channel_id)
                     logger.info(f"Attempted to get events channel: {events_channel_id}, result: {events_channel is not None}")
 
-                    if not events_channel:
+                    if events_channel is None:
                         try:
                             # Try to fetch channel through HTTP API in case it's not in cache
                             logger.info(f"Events channel not in cache, trying HTTP fetch for: {events_channel_id}")

@@ -157,7 +157,7 @@ async def main():
         # Connect to database
         startup_logger.info("Connecting to database...")
         db_result = await bot.init_db(max_retries=3)
-        if not db_result:
+        if db_result is None:
             startup_logger.critical("Failed to connect to database after multiple attempts")
             return 1
         

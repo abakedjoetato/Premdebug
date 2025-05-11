@@ -58,13 +58,13 @@ class PlayerLinksCog(commands.Cog):
         await interaction.response.defer(ephemeral=True)
 
         # Get server ID from guild config if not provided
-        if not server_id or server_id == "":
+        if server_id is None or server_id == "":
             # For now, hardcode a test server ID
             server_id = "test_server"
 
         # Check if player exists
         player = await Player.get_by_player_name(server_id, player_name)
-        if not player:
+        if player is None:
             embed = EmbedBuilder.error(
                 title="Player Not Found",
                 description=f"Player `{player_name}` not found on server `{server_id}`."
@@ -124,13 +124,13 @@ class PlayerLinksCog(commands.Cog):
         await interaction.response.defer(ephemeral=True)
 
         # Get server ID from guild config if not provided
-        if not server_id or server_id == "":
+        if server_id is None or server_id == "":
             # For now, hardcode a test server ID
             server_id = "test_server"
 
         # Check if player exists
         player = await Player.get_by_player_name(server_id, player_name)
-        if not player:
+        if player is None:
             embed = EmbedBuilder.error(
                 title="Player Not Found",
                 description=f"Player `{player_name}` not found on server `{server_id}`."
@@ -195,7 +195,7 @@ class PlayerLinksCog(commands.Cog):
         await interaction.response.defer(ephemeral=True)
 
         # Get server ID from guild config if not provided
-        if not server_id or server_id == "":
+        if server_id is None or server_id == "":
             # For now, hardcode a test server ID
             server_id = "test_server"
 
@@ -220,7 +220,7 @@ class PlayerLinksCog(commands.Cog):
         # Add player info
         for link in links:
             player = await Player.get_by_player_id(server_id, link.player_id)
-            if player:
+            if player is not None:
                 embed.add_field(
                     name=player.player_name,
                     value=f"Kills: {player.kills}\nDeaths: {player.deaths}\nK/D: {player.kd_ratio:.2f}",

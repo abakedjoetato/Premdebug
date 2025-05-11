@@ -124,7 +124,7 @@ class CSVProcessorCoordinator:
         """
         # Query the guild document to find the server
         guild_doc = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
-        if not guild_doc or "servers" not in guild_doc:
+        if guild_doc is None or "servers" not in guild_doc:
             logger.warning(f"Guild {guild_id} not found or has no servers")
             return None
 
@@ -196,7 +196,7 @@ class CSVProcessorCoordinator:
             try:
                 # Get server configuration
                 server_config = await self._get_server_config(guild_id, server_id)
-                if not server_config:
+                if server_config is None:
                     result["error"] = f"Server {server_id} not found in guild {guild_id}"
                     return result
 

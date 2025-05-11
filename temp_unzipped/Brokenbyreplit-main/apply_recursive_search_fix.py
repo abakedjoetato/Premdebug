@@ -278,7 +278,7 @@ def enhance_csv_processor_historical_parsing():
 """
     
     # Find the spot to insert our enhanced logic
-    insertion_point = "if server_config:"
+    insertion_point = "if server_config is not None:"
     if insertion_point in current_method:
         # Insert our enhanced logic after the matching line
         parts = current_method.split(insertion_point, 1)

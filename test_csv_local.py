@@ -77,7 +77,7 @@ async def test_csv_parser():
     events1 = csv_parser.parse_csv_data(content)
     logger.info(f"Parsed {len(events1)} events from full file")
     
-    if events1:
+    if events1 is not None:
         # Print first 2 events
         logger.info(f"First events: {json.dumps(events1[:2], default=str)}")
     
@@ -104,7 +104,7 @@ async def test_csv_parser():
     events4 = csv_parser._parse_csv_file(content_io, file_path=file_path, only_new_lines=True)
     logger.info(f"Parsed {len(events4)} events with only_new_lines=True (second run)")
     
-    if events4:
+    if events4 is not None:
         logger.warning("Expected no events in second run with only_new_lines=True")
     else:
         logger.info("SUCCESS: No events were processed in second run with only_new_lines=True")

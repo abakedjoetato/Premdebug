@@ -27,7 +27,7 @@ async def player_name_autocomplete(interaction, current):
         # Get user's guild ID and the server ID from the command options
         guild_id = interaction.guild_id
 
-        if guild_id is None:
+        if not guild_id:
             return [app_commands.Choice(name="Must use in a server", value="")]
 
         # Try to get the server_id from the interaction
@@ -36,7 +36,7 @@ async def player_name_autocomplete(interaction, current):
             for option in interaction.data.get("options", []):
                 if option.get("name") == "server_id":
                     raw_id = option.get("value")
-                    server_id = str(raw_id) if raw_id is not None else None
+                    server_id = str(raw_id) if raw_id else None
                     logger.debug(f"player_name_autocomplete converting server_id from {type(raw_id).__name__} to string: {server_id}")
                     break
 
@@ -44,20 +44,20 @@ async def player_name_autocomplete(interaction, current):
                 for suboption in option.get("options", []):
                     if suboption.get("name") == "server_id":
                         raw_id = suboption.get("value")
-                        server_id = str(raw_id) if raw_id is not None else None
+                        server_id = str(raw_id) if raw_id else None
                         logger.debug(f"player_name_autocomplete (subcommand) converting server_id from {type(raw_id).__name__} to string: {server_id}")
                         break
         except Exception as e:
             logger.error(f"Error extracting server_id from interaction: {e}")
             server_id = None
 
-        if server_id is None or server_id == "":
+        if not server_id or server_id == "":
             return [app_commands.Choice(name="Select a server first", value="")]
 
         # Get cached player data or fetch it
         cog = interaction.client.get_cog("Stats")
 
-        if cog is None:
+        if not cog:
             logger.error("Stats cog not found in player_name_autocomplete")
             return [app_commands.Choice(name="Error: Stats module not loaded", value="")]
 
@@ -67,7 +67,7 @@ async def player_name_autocomplete(interaction, current):
         cache_expired = False
         if not hasattr(cog, "player_autocomplete_cache"):
             cog.player_autocomplete_cache = {}
-            
+
         if cache_key not in cog.player_autocomplete_cache:
             cache_expired = True
         else:
@@ -87,7 +87,7 @@ async def player_name_autocomplete(interaction, current):
                     timeout=2.0
                 )
 
-                if players is not None:
+                if players:
                     # Update cache with valid player data
                     player_list = []
                     for player_data in players:
@@ -95,7 +95,7 @@ async def player_name_autocomplete(interaction, current):
                         player_name = player_data.get("player_name", "Unknown Player")
 
                         # Skip invalid entries
-                        if player_name is None or player_name == "" or player_name == "Unknown Player":
+                        if not player_name or player_name == "" or player_name == "Unknown Player":
                             continue
 
                         player_list.append({
@@ -122,12 +122,12 @@ async def player_name_autocomplete(interaction, current):
         # Get players from cache
         players = cog.player_autocomplete_cache.get(cache_key, {}).get("players", [])
 
-        if players is None or len(players) == 0:
+        if not players or len(players) == 0:
             return [app_commands.Choice(name="No players found", value="")]
 
         # Filter by current input
         try:
-            if current is not None:
+            if current:
                 filtered_players = [
                     app_commands.Choice(name=player['name'], value=player['name'])
                     for player in players
@@ -161,7 +161,7 @@ async def weapon_name_autocomplete(interaction, current):
         # Get user's guild ID and the server ID from the command options
         guild_id = interaction.guild_id
 
-        if guild_id is None:
+        if not guild_id:
             return [app_commands.Choice(name="Must use in a server", value="")]
 
         # Try to get the server_id from the interaction
@@ -170,7 +170,7 @@ async def weapon_name_autocomplete(interaction, current):
             for option in interaction.data.get("options", []):
                 if option.get("name") == "server_id":
                     raw_id = option.get("value")
-                    server_id = str(raw_id) if raw_id is not None else None
+                    server_id = str(raw_id) if raw_id else None
                     logger.debug(f"weapon_name_autocomplete converting server_id from {type(raw_id).__name__} to string: {server_id}")
                     break
 
@@ -178,14 +178,14 @@ async def weapon_name_autocomplete(interaction, current):
                 for suboption in option.get("options", []):
                     if suboption.get("name") == "server_id":
                         raw_id = suboption.get("value")
-                        server_id = str(raw_id) if raw_id is not None else None
+                        server_id = str(raw_id) if raw_id else None
                         logger.debug(f"weapon_name_autocomplete (subcommand) converting server_id from {type(raw_id).__name__} to string: {server_id}")
                         break
         except Exception as e:
             logger.error(f"Error extracting server_id from interaction in weapon_name_autocomplete: {e}")
             server_id = None
 
-        if server_id is None or server_id == "":
+        if not server_id or server_id == "":
             return [app_commands.Choice(name="Select a server first", value="")]
 
         # Import weapon stats
@@ -209,7 +209,7 @@ async def weapon_name_autocomplete(interaction, current):
             death_types = WEAPON_CATEGORIES.get("death_types", [])
 
             for weapon in WEAPON_DETAILS.keys():
-                if weapon is not None and weapon not in all_weapons and weapon not in death_types:
+                if weapon and weapon not in all_weapons and weapon not in death_types:
                     extra_weapons.append(weapon)
 
             all_weapons.extend(extra_weapons)
@@ -218,7 +218,7 @@ async def weapon_name_autocomplete(interaction, current):
             all_weapons = all_weapons[:500]  # Reasonable limit
 
             # Filter by current input
-            if current is not None:
+            if current:
                 current_lower = current.lower()
                 filtered_weapons = []
 
@@ -274,7 +274,7 @@ class Stats(commands.Cog):
     @commands.guild_only()
     async def stats(self, ctx):
         """Stats command group"""
-        if ctx.invoked_subcommand is None:
+        if not ctx.invoked_subcommand:
             await ctx.send("Please specify a subcommand.")
 
     @stats.command(name="player", description="View player statistics")
@@ -299,22 +299,22 @@ class Stats(commands.Cog):
             # Get guild using the get_guild method for consistency
             guild = await Guild.get_guild(self.bot.db, ctx.guild.id)
             guild_model = guild  # Use the guild as the model for embed theming
-            
-            if guild is None:
+
+            if not guild:
                 embed = EmbedBuilder.create_error_embed(
                     "Error",
                     "This guild is not set up. Please use the setup commands first."
                 )
                 await ctx.send(embed=embed)
                 return
-                
+
             # The premium_tier_required decorator already handles this check, 
             # so we don't need to do it again here
 
             # Find the server using the guild's servers attribute
             server = None
             server_name = server_id
-            
+
             # Get servers from the guild model
             for s in guild.servers:
                 if s.server_id == server_id:
@@ -322,8 +322,8 @@ class Stats(commands.Cog):
                     server_name = s.server_name or server_id
                     break
 
-            if server is None:
-                embed = EmbedBuilder.create_error_embed(
+            if not server:
+                embed = await EmbedBuilder.create_error_embed(
                     "Server Not Found",
                     f"Server with ID {server_id} not found in this guild."
                 , guild=guild_model)
@@ -333,8 +333,8 @@ class Stats(commands.Cog):
             # Find the player(s)
             players = await Player.get_by_name(self.bot.db, player_name, server_id)
 
-            if players is None or len(players) == 0:
-                embed = EmbedBuilder.create_error_embed(
+            if not players or len(players) == 0:
+                embed = await EmbedBuilder.create_error_embed(
                     "Player Not Found",
                     f"Player '{player_name}' not found on server {server_name}."
                 , guild=guild_model)
@@ -348,7 +348,7 @@ class Stats(commands.Cog):
                     player = p
                     break
 
-            if player is None:
+            if not player:
                 player = players[0]
 
             # Get detailed player stats
@@ -358,7 +358,7 @@ class Stats(commands.Cog):
             embeds = []
 
             # Primary stats embed
-            primary_embed = EmbedBuilder.create_stats_embed(player_stats, server_name)
+            primary_embed = await EmbedBuilder.create_stats_embed(player_stats, server_name)
 
             # Add core statistics
             kills = player_stats.get("kills", 0)
@@ -427,7 +427,7 @@ class Stats(commands.Cog):
             most_used_category = player_stats.get("most_used_category", {})
 
             weapon_style = ""
-            if most_used_category is not None and "name" in most_used_category:
+            if most_used_category and "name" in most_used_category:
                 category_name = most_used_category["name"]
                 if category_name == "sniper_rifles":
                     weapon_style = "Sniper"
@@ -450,7 +450,7 @@ class Stats(commands.Cog):
 
             # Add weapon category breakdown
             weapon_categories = player_stats.get("weapon_categories", {})
-            if weapon_categories is not None:
+            if weapon_categories:
                 # Format categories with percentages
                 if combat_kills > 0:
                     category_lines = []
@@ -767,12 +767,12 @@ class Stats(commands.Cog):
             # Check if the is not None guild has access to stats feature
             guild = Guild(self.bot.db, guild_data)
             if guild is None or not guild.check_feature_access("stats"):
-                embed = EmbedBuilder.create_error_embed(
-                    "Premium Feature",
-                    "Server statistics is a premium feature. Please upgrade to access this feature."
-                , guild=guild_model)
-                await ctx.send(embed=embed)
-                return
+                    embed = EmbedBuilder.create_error_embed(
+                        "Premium Feature",
+                        "Server statistics is a premium feature. Please upgrade to access this feature."
+                    , guild=guild_model)
+                    await ctx.send(embed=embed)
+                    return
 
             # Find the server
             server = None
@@ -781,8 +781,8 @@ class Stats(commands.Cog):
                     server = Server(self.bot.db, s)
                     break
 
-            if server is None:
-                embed = EmbedBuilder.create_error_embed(
+            if not server:
+                embed = await EmbedBuilder.create_error_embed(
                     "Server Not Found",
                     f"Server with ID {server_id} not found in this guild."
                 , guild=guild_model)
@@ -793,7 +793,7 @@ class Stats(commands.Cog):
             server_stats = await server.get_server_stats()
 
             # Create embed
-            embed = EmbedBuilder.create_server_stats_embed(server_stats)
+            embed = await EmbedBuilder.create_server_stats_embed(server_stats)
 
             # Add top killers
             top_killers = server_stats.get("top_killers", [])
@@ -901,8 +901,8 @@ class Stats(commands.Cog):
                     server_name = s.get("server_name", server_id)
                     break
 
-            if server is None:
-                embed = EmbedBuilder.create_error_embed(
+            if not server:
+                embed = await EmbedBuilder.create_error_embed(
                     "Server Not Found",
                     f"Server with ID {server_id} not found in this guild."
                 , guild=guild_model)
@@ -1013,8 +1013,8 @@ class Stats(commands.Cog):
                     server_name = s.get("server_name", server_id)
                     break
 
-            if server is None:
-                embed = EmbedBuilder.create_error_embed(
+            if not server:
+                embed = await EmbedBuilder.create_error_embed(
                     "Error",
                     f"Server {server_id} not found. Please select a valid server."
                 , guild=guild_model)
@@ -1168,8 +1168,8 @@ class Stats(commands.Cog):
                     server_name = s.get("server_name", server_id)
                     break
 
-            if server is None:
-                embed = EmbedBuilder.create_error_embed(
+            if not server:
+                embed = await EmbedBuilder.create_error_embed(
                     "Server Not Found",
                     f"Server with ID {server_id} not found in this guild."
                 , guild=guild_model)

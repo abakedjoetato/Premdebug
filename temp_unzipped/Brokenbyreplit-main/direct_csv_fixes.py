@@ -417,19 +417,19 @@ def main():
     
     # Apply fixes to direct CSV handler
     direct_handler_result = modify_direct_csv_handler()
-    if direct_handler_result:
+    if direct_handler_result is not None:
         logger.info("Successfully applied fixes to direct CSV handler")
     else:
         logger.error("Failed to apply fixes to direct CSV handler")
         
     # Apply fixes to CSV processor
     processor_result = modify_csv_processor()
-    if processor_result:
+    if processor_result is not None:
         logger.info("Successfully applied fixes to CSV processor")
     else:
         logger.error("Failed to apply fixes to CSV processor")
         
-    if direct_handler_result and processor_result:
+    if direct_handler_result is not None and processor_result:
         logger.info("All fixes have been applied successfully")
         return True
     else:

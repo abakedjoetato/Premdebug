@@ -151,14 +151,14 @@ async def run_csv_test():
                 try:
                     # Get database and find some events
                     db = bot.db
-                    if db:
+                    if db is not None:
                         # Query the most recent events
                         cursor = db.kills.find({"server_id": SERVER_ID}).sort("timestamp", -1).limit(5)
                         async for doc in cursor:
                             events.append(doc)
                         
                         # Show event examples
-                        if events:
+                        if events is not None:
                             event_list = ""
                             for i, event in enumerate(events):
                                 timestamp = event.get("timestamp")

@@ -34,7 +34,7 @@ async def create_player(db, player_id: str, server_id: str, name: str, **kwargs)
             **kwargs
         )
         
-        if player:
+        if player is not None:
             logger.info(f"Created/updated player: {player.name} (id={player.player_id}, server={player.server_id})")
         else:
             logger.error(f"Failed to create player: {name} (id={player_id}, server={server_id})")

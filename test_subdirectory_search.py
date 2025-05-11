@@ -91,7 +91,7 @@ async def test_with_id(db, server_id, id_type):
             events, line_count = direct_parse_csv_file(sample_file, server_id)
             logger.info(f"Successfully parsed {len(events)} events from {line_count} lines")
             
-            if events:
+            if events is not None:
                 logger.info(f"Sample event: {events[0]}")
         except Exception as e:
             logger.error(f"Error parsing file: {e}")

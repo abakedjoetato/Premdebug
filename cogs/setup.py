@@ -62,7 +62,7 @@ class Setup(commands.Cog):
             # Use get_or_create which will auto-create guild if it doesn't exist
             try:
                 guild_model = await Guild.get_or_create(self.bot.db, str(ctx.guild.id), ctx.guild.name)
-                if not guild_model:
+                if guild_model is None:
                     logger.error(f"Failed to get or create guild for {ctx.guild.id}")
                     await hybrid_send(ctx, "Error retrieving guild information. Please try again later.")
                     return
@@ -224,7 +224,7 @@ class Setup(commands.Cog):
                 original_server_id=original_server_id  # Pass the extracted or derived original server ID
             )
 
-            if not server:
+            if server is None:
                 embed = await EmbedBuilder.create_error_embed(
                     "Server Creation Failed",
                     "Failed to create server entry in database."
@@ -269,7 +269,7 @@ class Setup(commands.Cog):
 
             # Add server to guild
             add_result = await guild.add_server(server_data)
-            if not add_result:
+            if add_result is None:
                 embed = await EmbedBuilder.create_error_embed(
                     "Error Adding Server",
                     "Failed to add server to the database. This may be due to a server limit restriction."
@@ -373,7 +373,7 @@ class Setup(commands.Cog):
                             # Try the servers collection first (primary location)
                             try:
                                 server_doc = await self.bot.db.servers.find_one({"server_id": server_id})
-                                if server_doc:
+                                if server_doc is not None:
                                     server_config = server_doc
                                     db_server_id = server_doc.get("server_id")
                                     db_original_id = server_doc.get("original_server_id")
@@ -382,10 +382,10 @@ class Setup(commands.Cog):
                                 logger.error(f"Error retrieving from servers collection: {db_err}")
                             
                             # If not found in servers, try game_servers
-                            if not server_config:
+                            if server_config is None:
                                 try:
                                     server_doc = await self.bot.db.game_servers.find_one({"server_id": server_id})
-                                    if server_doc:
+                                    if server_doc is not None:
                                         server_config = server_doc
                                         db_server_id = server_doc.get("server_id")
                                         db_original_id = server_doc.get("original_server_id")
@@ -394,12 +394,12 @@ class Setup(commands.Cog):
                                     logger.error(f"Error retrieving from game_servers collection: {db_err}")
                             
                             # If still not found, try the guilds collection
-                            if not server_config:
+                            if server_config is None:
                                 try:
                                     guild_id_str = str(ctx.guild_id) if hasattr(ctx, 'guild_id') else (str(ctx.guild.id) if ctx.guild else None)
-                                    if guild_id_str:
+                                    if guild_id_str is not None:
                                         guild_doc = await self.bot.db.guilds.find_one({"guild_id": guild_id_str})
-                                        if guild_doc and "servers" in guild_doc:
+                                        if guild_doc is not None and "servers" in guild_doc:
                                             for guild_server in guild_doc.get("servers", []):
                                                 if guild_server.get("server_id") == server_id:
                                                     server_config = guild_server
@@ -413,7 +413,7 @@ class Setup(commands.Cog):
                             
                             # If we found a configuration, use it for the parse
                             # If not, fall back to just the server ID and rely on automatic resolution
-                            if server_config:
+                            if server_config is not None:
                                 # Ensure SFTP credentials are set correctly
                                 if not server_config.get("hostname") and server_config.get("sftp_host"):
                                     server_config["hostname"] = server_config.get("sftp_host")
@@ -526,7 +526,8 @@ class Setup(commands.Cog):
             # Get guild model with proper error handling
             try:
                 guild_model = await Guild.get_or_create(self.bot.db, str(ctx.guild.id), ctx.guild.name)
-                if not guild_model:
+                # Use explicit None check for MongoDB object
+                if guild_model is None:
                     raise ValueError("Failed to get or create guild model")
                     
                 # Log all servers in guild for debugging
@@ -566,7 +567,8 @@ class Setup(commands.Cog):
             server = await Server.get_by_id(self.bot.db, str(server_id), str(ctx.guild.id))
             
             # If server not found in game_servers but exists in guild.servers, create a temporary server object
-            if not server and server_in_guild:
+            # Use explicit None check for MongoDB objects
+            if server is None and server_in_guild is not None:
                 logger.info(f"Server not found in game_servers but exists in guild.servers, creating temporary server object")
                 # Create a basic server object from the guild.servers entry
                 from models.server import Server as ServerModel
@@ -582,7 +584,8 @@ class Setup(commands.Cog):
                     log_path=server_in_guild.get("log_path", "")
                 )
                 
-            if not server:
+            # Use explicit None check for MongoDB objects
+            if server is None:
                 embed = await EmbedBuilder.create_error_embed(
                     "Server Not Found", 
                     f"Could not find server with ID '{server_id}'.",
@@ -619,7 +622,7 @@ class Setup(commands.Cog):
                         
                         # Make sure we have the latest version of the guild model
                         fresh_guild_model = await Guild.get_by_id(self.bot.db, guild_id_val)
-                        if fresh_guild_model:
+                        if fresh_guild_model is not None:
                             await fresh_guild_model.remove_server(std_server_id)
                             logger.info(f"Successfully removed server from guild.servers array")
                         else:
@@ -644,7 +647,8 @@ class Setup(commands.Cog):
                             
                         # Now use the server object to delete from all collections
                         success = await server.delete(self.bot.db)
-                        if not success:
+                        # We need to use explicit is None check for MongoDB compatibility
+                        if success is None or success is False:
                             logger.warning(f"Server.delete() reported no deletions, but continuing with task cleanup")
                         
                         # Also try direct deletion from each collection as a backup
@@ -721,7 +725,8 @@ class Setup(commands.Cog):
                         embed = await EmbedBuilder.create_success_embed(
                             "Server Removed",
                             f"Successfully removed server '{server_name}'.",
-                            guild=fresh_guild_model or guild_model  # Use fresh model if available
+                            # Explicitly check for None - don't use "or" operator with MongoDB objects
+                            guild=(fresh_guild_model if fresh_guild_model is not None else guild_model)
                         )
                         
                         # Send response - handle interaction errors
@@ -744,7 +749,8 @@ class Setup(commands.Cog):
                         embed = await EmbedBuilder.create_error_embed(
                             "Error",
                             f"Failed to remove server: {str(e)}",
-                            guild=guild_model
+                            # Explicitly use the guild_model with database objects
+                            guild=guild_model if guild_model is not None else None
                         )
                         
                         # Handle interaction errors properly
@@ -819,7 +825,7 @@ class Setup(commands.Cog):
             # Get guild model
             guild_id = str(ctx.guild.id)
             guild = await Guild.get_by_id(self.bot.db, guild_id)
-            if not guild:
+            if guild is None:
                 await hybrid_send(ctx, "No configuration found for this guild.")
                 return
 
@@ -920,7 +926,7 @@ class Setup(commands.Cog):
 
             # Get guild and server models
             guild_model = await Guild.get_or_create(self.bot.db, str(ctx.guild.id), ctx.guild.name)
-            if not guild_model:
+            if guild_model is None:
                 await hybrid_send(ctx, "Error retrieving guild configuration.")
                 return
 
@@ -931,7 +937,7 @@ class Setup(commands.Cog):
                     server_data = server
                     break
 
-            if not server_data:
+            if server_data is None:
                 embed = await EmbedBuilder.create_error_embed(
                     "Server Not Found",
                     f"Server with ID '{server_id}' not found in this guild's configuration.",
@@ -959,7 +965,7 @@ class Setup(commands.Cog):
 
                 # Save updated guild model
                 result = await guild_model.save(self.bot.db)
-                if not result:
+                if result is None:
                     embed = await EmbedBuilder.create_error_embed(
                         "Update Failed",
                         "Failed to update channel configuration.",

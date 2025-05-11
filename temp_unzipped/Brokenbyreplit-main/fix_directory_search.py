@@ -108,7 +108,7 @@ def fix_direct_csv_handler():
                 logger.info(f"Added common location: {location}")
     
     # Add the server_id as a possible subdirectory name to check
-    if server_id and not server_id.startswith('/'):
+    if server_id is not None and not server_id.startswith('/'):
         for root_dir in unique_base_dirs.copy():
             potential_server_dir = os.path.join(root_dir, server_id)
             if os.path.exists(potential_server_dir) and os.path.isdir(potential_server_dir):

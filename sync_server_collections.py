@@ -33,7 +33,7 @@ async def sync_server_collections(server_id=None):
     """
     # Get database connection
     db = await get_db()
-    if not db:
+    if db is None:
         logger.error("Failed to connect to database")
         return False
     
@@ -43,7 +43,7 @@ async def sync_server_collections(server_id=None):
         # Call the database method to synchronize server data
         result = await db.synchronize_server_data(server_id)
         
-        if result:
+        if result is not None:
             logger.info("Server data synchronization completed successfully")
         else:
             logger.error("Server data synchronization failed")
@@ -66,7 +66,7 @@ async def main():
     # Run the synchronization process
     result = await sync_server_collections(server_id)
     
-    if result:
+    if result is not None:
         logger.info("Server data synchronization completed successfully")
         return 0
     else:

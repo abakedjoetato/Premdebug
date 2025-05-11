@@ -418,7 +418,7 @@ class LogParser:
             # Check for game events
             for event_type, pattern in EVENT_PATTERNS.items():
                 event_match = re.search(pattern, line)
-                if event_match:
+                if event_match is not None:
                     return {
                         "type": "event",
                         "timestamp": timestamp,

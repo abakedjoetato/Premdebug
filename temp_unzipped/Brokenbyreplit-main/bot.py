@@ -178,7 +178,7 @@ class Bot(commands.Bot):
             # Sync to specific debug guilds only
             for guild_id in self.debug_guilds:
                 guild = self.get_guild(guild_id)
-                if guild:
+                if guild is not None:
                     await self.tree.sync(guild=guild)
                     logger.info(f"Synced commands to guild {guild.name} ({guild_id})")
         else:

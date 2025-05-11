@@ -60,7 +60,7 @@ async def main():
                 player_name=name
             )
             
-            if player:
+            if player is not None:
                 logger.info(f"Player record: {player}")
                 known_aliases = getattr(player, 'known_aliases', [])
                 logger.info(f"Known aliases: {known_aliases}")
@@ -71,7 +71,7 @@ async def main():
         from models.player import Player
         final_player = await Player.get_by_player_id(bot.db, player_id)
         
-        if not final_player:
+        if final_player is None:
             logger.error(f"Cannot find final player record with ID {player_id}")
             return
             

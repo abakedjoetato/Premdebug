@@ -24,7 +24,7 @@ async def run_test():
     
     # Initialize database connection
     db_manager = await initialize_db()
-    if not db_manager:
+    if db_manager is None:
         logger.error("Failed to connect to database")
         return
         

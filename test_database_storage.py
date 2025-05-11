@@ -66,7 +66,7 @@ async def test_database_storage():
             total_processed += len(events)
             
             # Store events in the database
-            if events:
+            if events is not None:
                 # Mark events as test imports
                 for event in events:
                     event["test_import"] = True

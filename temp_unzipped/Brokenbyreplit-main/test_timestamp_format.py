@@ -37,7 +37,7 @@ def test_timestamp_parsing():
         # Parse the CSV data
         events = parser.parse_csv_data(csv_data)
         
-        if not events:
+        if events is None:
             logger.error(f"Failed to parse event for timestamp {ts}")
             continue
             

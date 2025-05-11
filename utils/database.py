@@ -71,7 +71,7 @@ class DatabaseManager:
             parts = self.connection_string.split("/")
             if len(parts) > 3:
                 db_name_part = parts[3].split("?")[0]
-                if db_name_part and len(db_name_part.strip()) > 0:
+                if db_name_part is not None and len(db_name_part.strip()) > 0:
                     db_name = db_name_part
                 else:
                     db_name = "emeralds_killfeed"
@@ -282,10 +282,10 @@ class DatabaseManager:
                     
                     # Update guilds collection servers array
                     guild_id = server_doc.get("guild_id")
-                    if guild_id:
+                    if guild_id is not None:
                         # Find the guild document
                         guild_doc = await self._db.guilds.find_one({"guild_id": guild_id})
-                        if guild_doc and "servers" in guild_doc:
+                        if guild_doc is not None and "servers" in guild_doc:
                             # Check if server exists in guild's servers array
                             servers = guild_doc.get("servers", [])
                             server_found = False
@@ -298,7 +298,7 @@ class DatabaseManager:
                                     break
                                     
                             # If server not found in guild.servers, add it
-                            if not server_found:
+                            if server_found is None:
                                 # Create a new server entry with all required fields
                                 new_server = {
                                     "server_id": server_id,
@@ -342,9 +342,9 @@ class DatabaseManager:
                     
                     # Update guilds collection servers array (similar to above)
                     guild_id = server_doc.get("guild_id")
-                    if guild_id:
+                    if guild_id is not None:
                         guild_doc = await self._db.guilds.find_one({"guild_id": guild_id})
-                        if guild_doc and "servers" in guild_doc:
+                        if guild_doc is not None and "servers" in guild_doc:
                             servers = guild_doc.get("servers", [])
                             server_found = False
                             
@@ -354,7 +354,7 @@ class DatabaseManager:
                                     server_found = True
                                     break
                                     
-                            if not server_found:
+                            if server_found is None:
                                 new_server = {
                                     "server_id": server_id,
                                     "original_server_id": original_id,
@@ -387,7 +387,7 @@ class DatabaseManager:
                     server_id = server.get("server_id")
                     
                     # Skip non-matching servers if specific server ID is provided for filtering
-                    if server_id_filter and server_id != server_id_filter:
+                    if server_id_filter is not None and server_id != server_id_filter:
                         continue
                         
                     # Check if original_server_id is missing
@@ -397,10 +397,10 @@ class DatabaseManager:
                         original_id = None
                         
                         # If server_id is not in UUID format, use it directly
-                        if server_id and ("-" not in server_id or len(server_id) < 30):
+                        if server_id is not None and ("-" not in server_id and len(server_id) < 30):
                             original_id = server_id
                         # Otherwise try to extract from server name
-                        elif server_name:
+                        elif server_name is not None:
                             # Look for numeric ID in server name
                             for word in str(server_name).split():
                                 if word.isdigit() and len(word) >= 4:
@@ -457,7 +457,7 @@ class DatabaseManager:
                             )
                 
                 # Update guild if servers were modified
-                if servers_updated:
+                if servers_updated is not None:
                     await self._db.guilds.update_one(
                         {"guild_id": guild_id},
                         {"$set": {

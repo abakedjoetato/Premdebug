@@ -55,7 +55,7 @@ async def test_live_csv_processing():
         
         # Get all server configurations with SFTP enabled
         server_configs = await csv_processor._get_server_configs()
-        if not server_configs:
+        if server_configs is None:
             logger.error("No server configs found")
             return False
         

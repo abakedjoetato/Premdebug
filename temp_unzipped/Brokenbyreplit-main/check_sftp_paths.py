@@ -70,7 +70,7 @@ async def check_sftp_paths():
         
         # Get server info
         server = await db.servers.find_one({"sftp_enabled": True})
-        if not server:
+        if server is None:
             logger.error("No SFTP-enabled server found in the database")
             return False
         

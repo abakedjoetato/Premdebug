@@ -52,7 +52,7 @@ async def trace_server_config(db, server_id: str, guild_id: Optional[str] = None
     # Check guilds collection
     logger.info("== CHECKING GUILDS COLLECTION ==")
     guild_query = {}
-    if guild_id:
+    if guild_id is not None:
         guild_query["guild_id"] = str(guild_id)
     guilds_cursor = db.guilds.find(guild_query)
     
@@ -93,13 +93,13 @@ async def trace_server_config(db, server_id: str, guild_id: Optional[str] = None
                 logger.info(f"sftp_path: {server.get('sftp_path', '/logs')}")
                 break
                 
-    if not found_in_guilds:
+    if found_in_guilds is None:
         logger.warning(f"Server {std_server_id} NOT FOUND in any guild's servers array")
     
     # Check servers collection (used by CSV processor)
     logger.info("== CHECKING SERVERS COLLECTION ==")
     server_in_servers = await db.servers.find_one({"server_id": std_server_id})
-    if server_in_servers:
+    if server_in_servers is not None:
         logger.info(f"FOUND SERVER in servers collection!")
         
         # Check for required SFTP fields
@@ -122,7 +122,7 @@ async def trace_server_config(db, server_id: str, guild_id: Optional[str] = None
     # Check game_servers collection
     logger.info("== CHECKING GAME_SERVERS COLLECTION ==")
     server_in_game_servers = await db.game_servers.find_one({"server_id": std_server_id})
-    if server_in_game_servers:
+    if server_in_game_servers is not None:
         logger.info(f"FOUND SERVER in game_servers collection!")
         
         # Check for required SFTP fields

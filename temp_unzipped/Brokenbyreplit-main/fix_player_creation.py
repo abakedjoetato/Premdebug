@@ -368,7 +368,7 @@ async def test_player_creation(db):
             deaths=2
         )
 
-        if created_player:
+        if created_player is not None:
             logger.info(f"Successfully created/updated player in database: {created_player}")
             logger.info(f"Updated stats: Kills={created_player.kills}, Deaths={created_player.deaths}")
             return True

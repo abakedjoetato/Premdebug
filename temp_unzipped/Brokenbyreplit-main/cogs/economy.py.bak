@@ -12,7 +12,7 @@ import logging
 import discord
 from discord.ext import commands
 from discord import app_commands
-from typing import Optional, List, Dict, Any, Union
+from typing import Optional, List, Dict, Any, Union, cast
 import random
 import asyncio
 import traceback
@@ -42,7 +42,7 @@ class Economy(commands.Cog):
     @commands.guild_only()
     async def economy(self, ctx):
         """Economy command group"""
-        if ctx.invoked_subcommand is None:
+        if not ctx.invoked_subcommand:
             await ctx.send("Please specify a subcommand.")
 
     @economy.command(name="balance", description="Check your balance")
@@ -60,7 +60,7 @@ class Economy(commands.Cog):
         player_id = str(ctx.author.id)
         economy = await EconomyModel.get_by_player(self.bot.db, player_id, server_id)
 
-        if economy is None:
+        if not economy:
             # Create new economy account
             economy = await EconomyModel.create_or_update(self.bot.db, player_id, server_id)
 
@@ -86,7 +86,7 @@ class Economy(commands.Cog):
             timeout_seconds=5
         )
         
-        if gambling_stats is not None:
+        if gambling_stats:
             blackjack_stats = gambling_stats.get("blackjack", {})
             slots_stats = gambling_stats.get("slots", {})
 
@@ -131,7 +131,7 @@ class Economy(commands.Cog):
         player_id = str(ctx.author.id)
         economy = await EconomyModel.get_by_player(self.bot.db, player_id, server_id)
 
-        if economy is None:
+        if not economy:
             # Create new economy account
             economy = await EconomyModel.create_or_update(self.bot.db, player_id, server_id)
 
@@ -152,7 +152,7 @@ class Economy(commands.Cog):
             timeout_seconds=5
         )
 
-        if success is not None:
+        if success:
             embed = await EmbedBuilder.create_success_embed(
                 "💰 Daily Reward",
                 message,
@@ -187,7 +187,7 @@ class Economy(commands.Cog):
             timeout_seconds=5
         )
         
-        if richest_players is None or len(richest_players) == 0:
+        if not richest_players or len(richest_players) == 0:
             embed = await EmbedBuilder.create_error_embed(
                 "No Data",
                 f"No player economy data found for server {server_name}.",
@@ -223,7 +223,7 @@ class Economy(commands.Cog):
     @commands.guild_only()
     async def gambling(self, ctx):
         """Gambling command group"""
-        if ctx.invoked_subcommand is None:
+        if not ctx.invoked_subcommand:
             await ctx.send("Please specify a subcommand.")
 
     @gambling.command(name="blackjack", description="Play blackjack")
@@ -253,11 +253,11 @@ class Economy(commands.Cog):
         player_id = str(ctx.author.id)
         economy = await EconomyModel.get_by_player(self.bot.db, player_id, server_id)
 
-        if economy is None:
+        if not economy:
             # Create new economy account
             economy = await EconomyModel.create_or_update(self.bot.db, player_id, server_id)
 
-        # Check if player is not None has enough credits
+        # Check if player has enough credits
         balance = await economy.get_balance()
         if balance < bet:
             embed = await EmbedBuilder.create_error_embed(
@@ -366,11 +366,11 @@ class Economy(commands.Cog):
         player_id = str(ctx.author.id)
         economy = await EconomyModel.get_by_player(self.bot.db, player_id, server_id)
 
-        if economy is None:
+        if not economy:
             # Create new economy account
             economy = await EconomyModel.create_or_update(self.bot.db, player_id, server_id)
 
-        # Check if player is not None has enough credits
+        # Check if player has enough credits
         balance = await retryable(
             economy.get_balance,
             exceptions=(TimeoutError, ConnectionError, Exception),
@@ -436,7 +436,7 @@ class Economy(commands.Cog):
             )
             return await ctx.send(embed=embed)
 
-        # Check if giving is not None to self
+        # Check if giving to self
         if ctx.author.id == user.id:
             embed = await EmbedBuilder.create_error_embed(
                 "Invalid Recipient",
@@ -455,7 +455,7 @@ class Economy(commands.Cog):
             timeout_seconds=5
         )
 
-        if player_economy is None:
+        if not player_economy:
             # Create new economy account
             player_economy = await retryable(
                 EconomyModel.create_or_update,
@@ -465,7 +465,7 @@ class Economy(commands.Cog):
                 timeout_seconds=5
             )
 
-        # Check if player is not None has enough credits
+        # Check if player has enough credits
         balance = await retryable(
             player_economy.get_balance,
             exceptions=(TimeoutError, ConnectionError, Exception),
@@ -491,7 +491,7 @@ class Economy(commands.Cog):
             timeout_seconds=5
         )
 
-        if recipient_economy is None:
+        if not recipient_economy:
             # Create new economy account for recipient
             recipient_economy = await retryable(
                 EconomyModel.create_or_update,
@@ -575,7 +575,7 @@ class Economy(commands.Cog):
             timeout_seconds=5
         )
 
-        if economy is None:
+        if not economy:
             # Create new economy account
             economy = await retryable(
                 EconomyModel.create_or_update,
@@ -621,7 +621,7 @@ class Economy(commands.Cog):
                 timeout_seconds=5
             )
 
-            if removal_result is None or removal_result is False:
+            if not removal_result:
                 embed = await EmbedBuilder.create_error_embed(
                     "Insufficient Funds",
                     f"Player only has {initial_balance} credits. Cannot remove {abs(amount)} credits.",
@@ -675,7 +675,7 @@ class Economy(commands.Cog):
 
         # If user is specified and not self, verify admin permissions
         target_user = user or ctx.author
-        if user is not None and user.id != ctx.author.id:
+        if user and user.id != ctx.author.id:
             from utils.helpers import has_admin_permission
             if not has_admin_permission(ctx):
                 embed = await EmbedBuilder.create_error_embed(
@@ -701,7 +701,7 @@ class Economy(commands.Cog):
             timeout_seconds=5
         )
 
-        if economy is None:
+        if not economy:
             # Create new economy account
             economy = await retryable(
                 EconomyModel.create_or_update,
@@ -736,7 +736,7 @@ class Economy(commands.Cog):
 
         embed.add_field(name="Current Balance", value=f"{current_balance} credits", inline=False)
 
-        if transactions is None or len(transactions) == 0:
+        if not transactions or len(transactions) == 0:
             embed.add_field(name="No Transactions", value="No transaction history found", inline=False)
         else:
             # Format transactions
@@ -749,14 +749,14 @@ class Economy(commands.Cog):
                 timestamp = tx.get("timestamp")
 
                 # Format timestamp
-                if timestamp is not None:
+                if timestamp:
                     if isinstance(timestamp, str):
                         try:
                             timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
                         except ValueError:
                             timestamp = None
 
-                    if timestamp is not None:
+                    if timestamp:
                         time_str = f"<t:{int(timestamp.timestamp())}:R>"
                     else:
                         time_str = "Unknown time"
@@ -796,7 +796,7 @@ class Economy(commands.Cog):
                 
                 embed.add_field(name=field_name, value=field_value, inline=False)
 
-            # Add note if there is not None are more transactions
+            # Add note if there are more transactions
             if len(transactions) > 10:
                 embed.add_field(
                     name="Note",
@@ -832,7 +832,7 @@ class Economy(commands.Cog):
         )
         
         # Ensure stats is not None
-        if stats is None:
+        if not stats:
             stats = {}  # Use an empty dict as fallback for safe access
             logger.warning(f"No economy statistics found for server {server_id}")
 
@@ -885,7 +885,7 @@ class Economy(commands.Cog):
         # Transaction sources with error handling
         try:
             sources = stats.get('transaction_sources', {})
-            if sources is not None and len(sources) > 0:
+            if sources and len(sources) > 0:
                 sources_text = ""
                 # Safely handle sorting with default values
                 try:
@@ -930,7 +930,7 @@ class Economy(commands.Cog):
             guild_model = None
             try:
                 guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
-                if guild_data is not None:
+                if guild_data:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
             except Exception as e:
@@ -941,7 +941,7 @@ class Economy(commands.Cog):
 
             # Validate server ID
             server = await guild.get_server(server_id)
-            if server is None:
+            if not server:
                 embed = await EmbedBuilder.create_error_embed(
                     "Invalid Server",
                     f"Could not find server with ID '{server_id}'. "
@@ -969,7 +969,7 @@ class Economy(commands.Cog):
                 server["_id"]
             )
 
-            # Check if player is not None has enough currency
+            # Check if player has enough currency
             balance = await economy.get_balance()
             if balance < bet:
                 embed = await EmbedBuilder.create_error_embed(

@@ -132,7 +132,7 @@ async def directly_test_csv_files():
                 logger.info("Parsing CSV with timestamp format %Y.%m.%d-%H.%M.%S")
                 events = csv_parser.parse(content, server_id=SERVER_ID)
                 
-                if not events:
+                if events is None:
                     logger.warning(f"No events found in {file_path}")
                     continue
                 

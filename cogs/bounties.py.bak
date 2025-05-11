@@ -14,8 +14,8 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional, Union
 
 import discord
-from discord import app_commands
 from discord.ext import commands, tasks
+from discord import app_commands
 
 from models.guild import Guild
 from models.bounty import Bounty
@@ -59,7 +59,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
             # Safely get database with validation
             try:
                 db = await get_db()
-                if db is None or not isinstance(db, DatabaseManager) or not db._connected:
+                if not db if db is not None else \2, DatabaseManager) or not db._connected:
                     logger.warning("Database not properly initialized, skipping expired bounties check")
                     return
 
@@ -85,7 +85,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
 
             try:
                 db = await get_db()
-                if db is None or not isinstance(db, DatabaseManager) or not db._connected:
+                if not db if db is not None else \2, DatabaseManager) or not db._connected:
                     logger.warning("Database not properly initialized, skipping auto bounties check")
                     return
 
@@ -101,7 +101,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
 
                     # Check if auto-bounties are enabled
                     auto_bounty = guild_data.get("auto_bounty", False)
-                    if auto_bounty is None:
+                    if not auto_bounty:
                         continue
 
                     # Get guild settings from dict
@@ -142,7 +142,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
                             )
 
                             for target in targets:
-                                # Check if we is not None should create a bounty
+                                # Check if we should create a bounty
                                 if target["killstreak"] >= kill_threshold:
                                     # Create killstreak bounty
                                     reason = f"Killstreak of {target['killstreak']} in {time_window} minutes"
@@ -195,7 +195,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
             from utils.database import get_db
             db = await get_db()
             existing_bounties = await Bounty.get_active_bounties_for_server_target(db, guild_id, server_id, player_id)
-            if existing_bounties is not None and len(existing_bounties) > 0:
+            if existing_bounties and len(existing_bounties) > 0:
                 # Already has an active bounty, don't create another
                 return
 
@@ -230,7 +230,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
                 if bounty_channel_id is not None:
                     try:
                         channel = self.bot.get_channel(int(bounty_channel_id))
-                        if channel is not None:
+                        if channel:
                             embed = self._create_bounty_embed(bounty, "Auto-Bounty Created", True)
                             await channel.send(embed=embed)
                     except Exception as e:
@@ -263,7 +263,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
         embed = EmbedBuilder.info(title=title)
 
         # Set the description
-        if is_auto is not None:
+        if is_auto:
             embed.description = f"💀 **Auto-Bounty Alert** 💀\n\n"
         else:
             embed.description = f"💰 **Bounty Placed** 💰\n\n"
@@ -278,7 +278,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
         embed.add_field(name="Reason", value=bounty.reason, inline=False)
 
         # Add expiration
-        if bounty.expires_at is not None:
+        if bounty.expires_at:
             # Calculate time remaining
             now = datetime.utcnow()
             if bounty.expires_at > now:
@@ -292,8 +292,8 @@ class BountiesCog(commands.GroupCog, name="bounty"):
             else:
                 embed.add_field(name="Expires", value="Expired", inline=True)
 
-        # Add placer info if auto is None
-        if is_auto is None:
+        # Add placer info if not auto
+        if not is_auto:
             embed.add_field(name="Placed By", value=bounty.placed_by_name, inline=True)
 
         # Add ID reference
@@ -310,7 +310,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
         Returns:
             List of embeds, one per page
         """
-        if bounties is None or len(bounties) == 0:
+        if not bounties or len(bounties) == 0:
             # No bounties
             embed = EmbedBuilder.info(
                 title="No Active Bounties", 
@@ -336,7 +336,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
             for bounty in page_bounties:
                 # Calculate time remaining
                 now = datetime.utcnow()
-                if bounty.expires_at is not None and bounty.expires_at > now:
+                if bounty.expires_at and bounty.expires_at > now:
                     time_remaining = bounty.expires_at - now
                     minutes = time_remaining.seconds // 60
                     expires = f"In {minutes} minutes"
@@ -398,7 +398,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
                 )
                 return
 
-            # Use the utility method to check if the is not None server exists
+            # Use the utility method to check if the server exists
             server_exists = await check_server_exists(db, guild.id, server_id)
 
             if server_exists is False:
@@ -433,11 +433,11 @@ class BountiesCog(commands.GroupCog, name="bounty"):
             player_id = player_data.get("player_id")
             player_name = player_data.get("name")  # Use exact name from database
 
-            # Check if player is not None is trying to place a bounty on themselves
+            # Check if player is trying to place a bounty on themselves
             is_self_bounty = False
             discord_id = str(interaction.user.id)
 
-            # Check if the is not None player is linked to the Discord user
+            # Check if the player is linked to the Discord user
             link_query = {
                 "discord_id": discord_id,
                 "server_id": server_id,
@@ -446,14 +446,14 @@ class BountiesCog(commands.GroupCog, name="bounty"):
             }
             self_link = await db.db.player_links.find_one(link_query)
 
-            if self_link is not None:
+            if self_link:
                 await interaction.followup.send(
                     "Error: You cannot place a bounty on yourself.",
                     ephemeral=True
                 )
                 return
 
-            # Check if user is not None has enough currency
+            # Check if user has enough currency
             economy = await Economy.get_by_player(db, discord_id, server_id)
             if economy is None:
                 # Create economy profile if it doesn\'t exist
@@ -491,7 +491,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
                 "reason": reason
             })
 
-            if success is None:
+            if not success:
                 await interaction.followup.send(
                     "Error: Failed to deduct currency for the bounty.",
                     ephemeral=True
@@ -518,14 +518,14 @@ class BountiesCog(commands.GroupCog, name="bounty"):
             from utils.discord_utils import hybrid_send
             await interaction.followup.send(interaction, embed=embed)
 
-            # Also announce in bounty channel if configured is not None
+            # Also announce in bounty channel if configured
             bounty_channel_id = None
             if hasattr(guild, "data") and isinstance(guild.data, dict):
                 bounty_channel_id = guild.data.get("bounty_channel")
             if bounty_channel_id is not None and bounty_channel_id != str(interaction.channel_id):
                 try:
                     channel = self.bot.get_channel(int(bounty_channel_id))
-                    if channel is not None:
+                    if channel:
                         await channel.send(embed=embed)
                 except Exception as e:
                     logger.error(f"Error announcing bounty: {e}")
@@ -576,7 +576,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
                 )
                 return
 
-            # Use the utility method to check if the is not None server exists
+            # Use the utility method to check if the server exists
             server_exists = await check_server_exists(db, guild.id, server_id)
 
             if server_exists is False:
@@ -659,7 +659,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
                 )
                 return
 
-            # Use the utility method to check if the is not None server exists
+            # Use the utility method to check if the server exists
             server_exists = await check_server_exists(db, guild.id, server_id)
 
             if server_exists is False:
@@ -681,7 +681,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
             bounties = bounties[:20]
 
             # Create the embed
-            if bounties is None or len(bounties) == 0:
+            if not bounties or len(bounties) == 0:
                 embed = EmbedBuilder.info(
                     title=title,
                     description=f"You haven't {view_type} any bounties on this server."
@@ -703,7 +703,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
                     # Status info
                     if bounty.status == Bounty.STATUS_ACTIVE:
                         status = "Active"
-                        if bounty.expires_at is not None:
+                        if bounty.expires_at:
                             now = datetime.utcnow()
                             if bounty.expires_at > now:
                                 time_remaining = bounty.expires_at - now
@@ -805,13 +805,13 @@ class BountiesCog(commands.GroupCog, name="bounty"):
             # Handle different settings
             if setting == "auto_bounty":
                 # Toggle auto-bounty system
-                new_value = value.lower() in ["true", "on", "yes", "1"] if value is not None else not guild_data.get("auto_bounty", False)
+                new_value = value.lower() in ["true", "on", "yes", "1"] if value else not guild_data.get("auto_bounty", False)
                 update = {"auto_bounty": new_value}
-                message = f"Auto-bounty system is now {'enabled' if new_value is not None else 'disabled'}."
+                message = f"Auto-bounty system is now {'enabled' if new_value else 'disabled'}."
 
             elif setting == "bounty_channel":
                 # Set bounty announcement channel
-                if channel is None:
+                if not channel:
                     await interaction.followup.send(
                         "Error: You must specify a channel.",
                         ephemeral=True
@@ -823,7 +823,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
 
             else:
                 # Other numeric settings
-                if value is None or value == "" or (value is not None and not value.isdigit()):
+                if not value or value == "" or (value and not value.isdigit()):
                     await interaction.followup.send(
                         "Error: You must provide a numeric value for this setting.",
                         ephemeral=True

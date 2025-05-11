@@ -30,7 +30,7 @@ def identify_server(server_id: str, hostname: Optional[str] = None,
             - is_known_mapping: True if this was a known mapping, False if derived
     """
     # First check if this is already a numeric ID
-    if server_id and server_id.isdigit():
+    if server_id is not None and server_id.isdigit():
         logger.debug(f"Server ID {server_id} appears to already be numeric")
         return server_id, False
 
@@ -41,7 +41,7 @@ def identify_server(server_id: str, hostname: Optional[str] = None,
         return numeric_id, True
 
     # Try to extract a numeric part from the UUID
-    if server_id:
+    if server_id is not None:
         # Extract a numeric value from the first part of the UUID
         uuid_parts = server_id.split('-')
         if uuid_parts:

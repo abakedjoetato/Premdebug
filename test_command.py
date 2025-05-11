@@ -86,7 +86,7 @@ async def test_csv_processing():
             # Use our manual config
             server_configs = {SERVER_ID: SERVER_CONFIG}
         
-        if not server_configs:
+        if server_configs is None:
             logger.error("No server configurations found")
             await channel.send("❌ No server configurations found - test failed")
             return False

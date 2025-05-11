@@ -560,7 +560,7 @@ def fix_direct_csv_handler():
                 logger.info(f"Added common location: {location}")
     
     # Add the server_id as a possible subdirectory name to check
-    if server_id and not server_id.startswith('/'):
+    if server_id is not None and not server_id.startswith('/'):
         for root_dir in unique_base_dirs.copy():
             potential_server_dir = os.path.join(root_dir, server_id)
             if os.path.exists(potential_server_dir) and os.path.isdir(potential_server_dir):
@@ -640,7 +640,7 @@ def fix_direct_csv_handler():
             # Parse events - unpack tuple return value (events, line_count)
             events, line_count = direct_parse_csv_file(file_path, server_id)
             
-            if events:
+            if events is not None:
                 logger.info(f"Successfully parsed {len(events)} events from {os.path.basename(file_path)} ({line_count} total lines)")
                 
                 # Import events with better error handling

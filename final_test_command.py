@@ -43,7 +43,7 @@ async def run_command():
         # Parse the test data
         events = parser.parse_csv_data(test_csv_line)
         
-        if not events or not isinstance(events[0].get('timestamp'), datetime):
+        if not events if events is not None else \2), datetime):
             logger.error("Parser verification failed")
             print("❌ Parser verification failed - check final_test.log")
             return

@@ -485,7 +485,7 @@ async def fix_csv_parser() -> bool:
 
 async def reset_database_tracking(db):
     """Reset database tracking for files"""
-    if not db:
+    if db is None:
         logger.error("Database connection not available")
         return False
         
@@ -586,7 +586,7 @@ async def main():
         
         # Reset database tracking if we have a database connection
         db_reset = False
-        if db:
+        if db is not None:
             db_reset = await reset_database_tracking(db)
         
         # Verify the fixes
@@ -616,7 +616,7 @@ async def main():
         return False
     finally:
         # Close database connection
-        if db and hasattr(db, 'client') and hasattr(db.client, 'close'):
+        if db is not None and hasattr(db, 'client') and hasattr(db.client, 'close'):
             await db.client.close()
             logger.info("Closed database connection")
 

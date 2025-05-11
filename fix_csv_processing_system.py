@@ -103,7 +103,7 @@ async def main():
     
     # Connect to database
     db = await connect_to_db()
-    if not db:
+    if db is None:
         logger.error("Failed to connect to database, exiting")
         return 1
     

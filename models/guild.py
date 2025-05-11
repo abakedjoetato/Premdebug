@@ -104,18 +104,18 @@ class Guild(BaseModel):
                 numeric_id = KNOWN_SERVERS[server_id]
                 logger.info(f"Using known numeric ID '{numeric_id}' from KNOWN_SERVERS for server {server_id}")
                 server_data["original_server_id"] = numeric_id
-            elif original_server_id and original_server_id in KNOWN_SERVERS:
+            elif original_server_id is not None and original_server_id in KNOWN_SERVERS:
                 numeric_id = KNOWN_SERVERS[original_server_id]
                 logger.info(f"Using known numeric ID '{numeric_id}' from KNOWN_SERVERS for original_server_id {original_server_id}")
                 server_data["original_server_id"] = numeric_id
                 
             # 2. Priority 2: If original_server_id is provided and is numeric, use it directly
-            elif original_server_id and str(original_server_id).isdigit():
+            elif original_server_id is not None and str(original_server_id).isdigit():
                 logger.info(f"Using existing numeric original_server_id: {original_server_id}")
                 # Keep existing value - already set
                 
             # 3. Priority 3: Extract from server name (often contains numeric IDs)
-            elif server_name:
+            elif server_name is not None:
                 # Look for numeric ID in server name (common pattern: "Server 7020" or "EU 7020")
                 found = False
                 for word in str(server_name).split():
@@ -177,7 +177,7 @@ class Guild(BaseModel):
         except ImportError as e:
             logger.error(f"Failed to import server_identity, using basic fallback: {e}")
             # Simple fallback if server_identity can't be imported
-            if not original_server_id:
+            if original_server_id is None:
                 # Extract from server name
                 for word in str(server_name).split():
                     if word.isdigit() and len(word) >= 4:
@@ -185,7 +185,7 @@ class Guild(BaseModel):
                         break
                 else:
                     # Use server_id digits as fallback
-                    if server_id:
+                    if server_id is not None:
                         uuid_digits = ''.join(filter(str.isdigit, str(server_id)))
                         extracted_id = uuid_digits[-5:] if len(uuid_digits) >= 5 else uuid_digits
                         server_data["original_server_id"] = extracted_id or server_id
@@ -270,7 +270,7 @@ class Guild(BaseModel):
         standardized_server_id = standardize_server_id(server_id)
         str_server_id = str(server_id) if server_id is not None else ""
         
-        if not standardized_server_id:
+        if standardized_server_id is None:
             logger.warning(f"Invalid server_id format for removal: {server_id}")
             return False
             

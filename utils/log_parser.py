@@ -355,7 +355,7 @@ class LogParser:
         self.original_server_id = original_server_id or server_id  # The original/numeric ID for path construction
         
         # Use the server_identity module for consistent identity persistence
-        if not self.original_server_id or not str(self.original_server_id).isdigit():
+        if self.original_server_id is None or not self.original_server_id.isdigit():
             from utils.server_identity import identify_server
             
             # Get consistent numeric ID for server identification

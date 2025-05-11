@@ -43,7 +43,7 @@ except Exception as e:
 async def check_directories(sftp, server_id, original_server_id):
     """Check if the expected directory structure exists"""
     # Define the expected paths
-    if not original_server_id:
+    if original_server_id is None:
         logger.warning("No original server ID provided, using UUID format")
         base_path = f"/hostname_{server_id}/actual1/deathlogs"
     else:

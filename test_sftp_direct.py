@@ -139,7 +139,7 @@ async def test_sftp_connection():
         logger.info(f"Total events processed: {len(events)}")
         
         # Log some event details
-        if events:
+        if events is not None:
             sample_event = events[0]
             logger.info(f"Sample event: {json.dumps(sample_event, default=str)}")
             

@@ -177,7 +177,7 @@ class CSVParser:
             logger.info(f"Successfully parsed {len(events)} events from CSV data")
             
             # Log a sample of the parsed events
-            if events:
+            if events is not None:
                 sample_event = str(events[0])[:200] + "..." if len(str(events[0])) > 200 else str(events[0])
                 logger.info(f"Sample parsed event: {sample_event}")
                 
@@ -711,12 +711,12 @@ class CSVParser:
             if self.format_name == "deadside":
                 filtered_events = [
                     event for event in filtered_events
-                    if event.get("killer_id") == player_id or event.get("victim_id") == player_id
+                    if event.get("killer_id") == player_id
                 ]
             elif self.format_name == "custom":
                 filtered_events = [
                     event for event in filtered_events
-                    if event.get("player1_id") == player_id or event.get("player2_id") == player_id
+                    if event.get("player1_id") == player_id
                 ]
 
         # Filter by distance range
@@ -1052,7 +1052,7 @@ class CSVParser:
                         if "required_columns" in format_config:
                             required_ok = True
                             for req_col in format_config["required_columns"]:
-                                if not record or not record.get(req_col):
+                                if record is None or req_col not in record:
                                     required_ok = False
                                     break
 
@@ -1163,7 +1163,7 @@ class CSVParser:
                     if "required_columns" in format_config:
                         required_ok = True
                         for req_col in format_config["required_columns"]:
-                            if not record or not record.get(req_col):
+                            if record is None or req_col not in record:
                                 required_ok = False
                                 break
 

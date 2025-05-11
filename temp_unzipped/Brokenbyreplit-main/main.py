@@ -56,7 +56,7 @@ async def main():
         # Connect to database
         logger.info("Connecting to database...")
         db_success = await bot.init_db()
-        if not db_success:
+        if db_success is None:
             logger.error("Failed to connect to database")
             return 1
 

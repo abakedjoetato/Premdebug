@@ -28,7 +28,7 @@ def get_base_path(hostname: str, server_id: str, original_server_id: Optional[st
     # Use original_server_id for path construction if provided
     path_server_id = original_server_id if original_server_id else server_id
     
-    if original_server_id and original_server_id != server_id:
+    if original_server_id is not None and original_server_id != server_id:
         logger.debug(f"Using original server ID '{original_server_id}' for path construction instead of '{server_id}'")
     
     return os.path.join("/", f"{clean_host}_{path_server_id}")

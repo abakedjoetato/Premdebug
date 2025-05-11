@@ -66,7 +66,7 @@ async def test_local_parsing():
                 events = parser.parse_csv_file(file_path)
                 logger.info(f"Found {len(events)} raw events in file {file_path}")
                 
-                if not events:
+                if events is None:
                     logger.error(f"No events parsed from file {file_path} - parser returned empty list")
                     continue
                 
@@ -124,13 +124,13 @@ async def test_sftp_connection():
         
         # Initialize database
         db = await get_db()
-        if not db:
+        if db is None:
             logger.error("Failed to connect to database")
             return False
             
         # Get server configuration
         server = await db.game_servers.find_one({"server_id": TARGET_SERVER_ID})
-        if not server:
+        if server is None:
             logger.error(f"Server {TARGET_SERVER_ID} not found in database")
             return False
             

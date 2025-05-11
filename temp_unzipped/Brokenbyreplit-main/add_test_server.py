@@ -21,7 +21,7 @@ async def add_test_server():
     guild_name = "Emerald Servers"  
     
     guild = await Guild.get_by_id(db, guild_id)
-    if not guild:
+    if guild is None:
         logger.info(f"Creating guild {guild_name} with ID {guild_id}")
         guild = Guild(db, {
             "guild_id": guild_id,
@@ -54,7 +54,7 @@ async def add_test_server():
     
     # Check if server already exists
     existing_server = await db.servers.find_one({"server_id": server_data["server_id"]})
-    if existing_server:
+    if existing_server is not None:
         logger.info(f"Server already exists with ID {server_data['server_id']}, updating...")
         await db.servers.update_one(
             {"server_id": server_data["server_id"]},
@@ -66,7 +66,7 @@ async def add_test_server():
     
     # Verify server exists
     server = await db.servers.find_one({"server_id": server_data["server_id"]})
-    if server:
+    if server is not None:
         logger.info(f"Successfully saved server: {server.get('server_name')} (ID: {server.get('server_id')})")
         logger.info(f"SFTP details: Host: {server.get('sftp_host')}, Enabled: {server.get('sftp_enabled')}")
     else:

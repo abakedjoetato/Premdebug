@@ -27,7 +27,7 @@ async def player_name_autocomplete(interaction, current):
         # Get user's guild ID and the server ID from the command options
         guild_id = interaction.guild_id
 
-        if not guild_id:
+        if guild_id is None:
             return [app_commands.Choice(name="Must use in a server", value="")]
 
         # Try to get the server_id from the interaction
@@ -51,7 +51,7 @@ async def player_name_autocomplete(interaction, current):
             logger.error(f"Error extracting server_id from interaction: {e}")
             server_id = None
 
-        if not server_id or server_id == "":
+        if server_id is None or server_id == "":
             return [app_commands.Choice(name="Select a server first", value="")]
 
         # Get cached player data or fetch it
@@ -87,7 +87,7 @@ async def player_name_autocomplete(interaction, current):
                     timeout=2.0
                 )
 
-                if players:
+                if players is not None:
                     # Update cache with valid player data
                     player_list = []
                     for player_data in players:
@@ -95,7 +95,7 @@ async def player_name_autocomplete(interaction, current):
                         player_name = player_data.get("player_name", "Unknown Player")
 
                         # Skip invalid entries
-                        if not player_name or player_name == "" or player_name == "Unknown Player":
+                        if player_name is None or player_name == "" or player_name == "Unknown Player":
                             continue
 
                         player_list.append({
@@ -122,7 +122,7 @@ async def player_name_autocomplete(interaction, current):
         # Get players from cache
         players = cog.player_autocomplete_cache.get(cache_key, {}).get("players", [])
 
-        if not players or len(players) == 0:
+        if not players if players is not None else \2) == 0:
             return [app_commands.Choice(name="No players found", value="")]
 
         # Filter by current input
@@ -161,7 +161,7 @@ async def weapon_name_autocomplete(interaction, current):
         # Get user's guild ID and the server ID from the command options
         guild_id = interaction.guild_id
 
-        if not guild_id:
+        if guild_id is None:
             return [app_commands.Choice(name="Must use in a server", value="")]
 
         # Try to get the server_id from the interaction
@@ -185,7 +185,7 @@ async def weapon_name_autocomplete(interaction, current):
             logger.error(f"Error extracting server_id from interaction in weapon_name_autocomplete: {e}")
             server_id = None
 
-        if not server_id or server_id == "":
+        if server_id is None or server_id == "":
             return [app_commands.Choice(name="Select a server first", value="")]
 
         # Import weapon stats
@@ -300,7 +300,7 @@ class Stats(commands.Cog):
             guild = await Guild.get_guild(self.bot.db, ctx.guild.id)
             guild_model = guild  # Use the guild as the model for embed theming
 
-            if not guild:
+            if guild is None:
                 embed = EmbedBuilder.create_error_embed(
                     "Error",
                     "This guild is not set up. Please use the setup commands first."
@@ -322,7 +322,7 @@ class Stats(commands.Cog):
                     server_name = s.server_name or server_id
                     break
 
-            if not server:
+            if server is None:
                 embed = await EmbedBuilder.create_error_embed(
                     "Server Not Found",
                     f"Server with ID {server_id} not found in this guild."
@@ -333,7 +333,7 @@ class Stats(commands.Cog):
             # Find the player(s)
             players = await Player.get_by_name(self.bot.db, player_name, server_id)
 
-            if not players or len(players) == 0:
+            if not players if players is not None else \2) == 0:
                 embed = await EmbedBuilder.create_error_embed(
                     "Player Not Found",
                     f"Player '{player_name}' not found on server {server_name}."
@@ -348,7 +348,7 @@ class Stats(commands.Cog):
                     player = p
                     break
 
-            if not player:
+            if player is None:
                 player = players[0]
 
             # Get detailed player stats
@@ -781,7 +781,7 @@ class Stats(commands.Cog):
                     server = Server(self.bot.db, s)
                     break
 
-            if not server:
+            if server is None:
                 embed = await EmbedBuilder.create_error_embed(
                     "Server Not Found",
                     f"Server with ID {server_id} not found in this guild."
@@ -901,7 +901,7 @@ class Stats(commands.Cog):
                     server_name = s.get("server_name", server_id)
                     break
 
-            if not server:
+            if server is None:
                 embed = await EmbedBuilder.create_error_embed(
                     "Server Not Found",
                     f"Server with ID {server_id} not found in this guild."
@@ -1013,7 +1013,7 @@ class Stats(commands.Cog):
                     server_name = s.get("server_name", server_id)
                     break
 
-            if not server:
+            if server is None:
                 embed = await EmbedBuilder.create_error_embed(
                     "Error",
                     f"Server {server_id} not found. Please select a valid server."
@@ -1168,7 +1168,7 @@ class Stats(commands.Cog):
                     server_name = s.get("server_name", server_id)
                     break
 
-            if not server:
+            if server is None:
                 embed = await EmbedBuilder.create_error_embed(
                     "Server Not Found",
                     f"Server with ID {server_id} not found in this guild."

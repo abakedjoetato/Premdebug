@@ -24,7 +24,7 @@ async def remove_test_server():
     logger.info("Checking servers collection...")
     test_server = await db.servers.find_one({"server_id": "test_server_123"})
     
-    if test_server:
+    if test_server is not None:
         logger.info(f"Found test server in servers collection: {test_server.get('server_id')} in guild {test_server.get('guild_id')}")
         logger.info(f"SFTP details: {test_server.get('sftp_host')}:{test_server.get('sftp_port')}")
         
@@ -38,7 +38,7 @@ async def remove_test_server():
     logger.info("Checking game_servers collection...")
     game_server = await db.game_servers.find_one({"server_id": "test_server_123"})
     
-    if game_server:
+    if game_server is not None:
         logger.info(f"Found test server in game_servers collection: {game_server.get('server_id')} in guild {game_server.get('guild_id')}")
         
         # Delete the server
@@ -52,7 +52,7 @@ async def remove_test_server():
     # Find any test servers in servers collection
     test_servers = await db.servers.find({"server_id": {"$regex": "test", "$options": "i"}}).to_list(length=100)
     
-    if test_servers and len(test_servers) > 0:
+    if test_servers is not None and len(test_servers) > 0:
         logger.info(f"Found {len(test_servers)} test servers in servers collection:")
         for server in test_servers:
             server_id = server.get('server_id')
@@ -66,7 +66,7 @@ async def remove_test_server():
     # Find any test servers in game_servers collection
     game_test_servers = await db.game_servers.find({"server_id": {"$regex": "test", "$options": "i"}}).to_list(length=100)
     
-    if game_test_servers and len(game_test_servers) > 0:
+    if game_test_servers is not None and len(game_test_servers) > 0:
         logger.info(f"Found {len(game_test_servers)} test servers in game_servers collection:")
         for server in game_test_servers:
             server_id = server.get('server_id')
@@ -81,7 +81,7 @@ async def remove_test_server():
     logger.info("Checking for test servers in guilds collection...")
     guilds_with_test = await db.guilds.find({"servers.server_id": {"$regex": "test", "$options": "i"}}).to_list(length=100)
     
-    if guilds_with_test and len(guilds_with_test) > 0:
+    if guilds_with_test is not None and len(guilds_with_test) > 0:
         logger.info(f"Found {len(guilds_with_test)} guilds with test servers:")
         for guild in guilds_with_test:
             guild_id = guild.get('guild_id')

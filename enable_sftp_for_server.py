@@ -41,7 +41,7 @@ async def enable_sftp_for_server():
     # Check if server already exists in servers collection
     existing_server = await db.servers.find_one({"server_id": server_id})
 
-    if existing_server:
+    if existing_server is not None:
         logger.info(f"Server {server_id} already exists in servers collection, updating...")
         server_result = await db.servers.update_one(
             {"server_id": server_id},
@@ -80,7 +80,7 @@ async def enable_sftp_for_server():
 
     # Check guild collection
     guild = await db.guilds.find_one({"guild_id": guild_id})
-    if guild:
+    if guild is not None:
         servers = guild.get("servers", [])
         for server in servers:
             if server.get("server_id") == server_id:
@@ -90,7 +90,7 @@ async def enable_sftp_for_server():
 
     # Check servers collection
     server = await db.servers.find_one({"server_id": server_id})
-    if server:
+    if server is not None:
         logger.info(f"Server in servers collection: {server.get('server_name')} (ID: {server_id})")
         logger.info(f"  SFTP Enabled: {server.get('sftp_enabled')}")
         logger.info(f"  SFTP Host: {server.get('sftp_host')}:{server.get('sftp_port')}")

@@ -30,7 +30,7 @@ def identify_server(server_id: str, hostname: Optional[str] = None,
             - is_known_mapping: True if this was a known mapping, False if derived
     """
     # First check if this is already a numeric ID
-    if server_id and server_id.isdigit():
+    if server_id is not None and server_id.isdigit():
         logger.debug(f"Server ID {server_id} appears to already be numeric")
         return server_id, False
 
@@ -41,7 +41,7 @@ def identify_server(server_id: str, hostname: Optional[str] = None,
         return numeric_id, True
 
     # Try to extract a numeric part from the UUID
-    if server_id:
+    if server_id is not None:
         # Extract a numeric value from the first part of the UUID
         uuid_parts = server_id.split('-')
         if uuid_parts:
@@ -93,12 +93,12 @@ def extract_numeric_id(server_id: str, server_name: Optional[str] = None,
     # logger.debug(f"Attempting to extract numeric ID from: id={server_id}, name={server_name}, host={hostname}")
     
     # Strategy 1: If server_id is numeric, use it directly
-    if server_id and str(server_id).isdigit():
+    if server_id is not None and str(server_id).isdigit():
         # logger.debug(f"Server ID is already numeric: {server_id}")
         return str(server_id)
     
     # Strategy 2: Check in server name (common pattern: "Server 1234")
-    if server_name:
+    if server_name is not None:
         # Look for any numeric sequences that are at least 4 digits
         for word in str(server_name).split():
             if word.isdigit() and len(word) >= 4:
@@ -133,7 +133,7 @@ def extract_numeric_id(server_id: str, server_name: Optional[str] = None,
         return num_id
     
     # Strategy 5: Try to extract from UUID if it looks like one
-    if server_id and '-' in server_id and len(server_id) > 30:
+    if server_id is not None and '-' in server_id and len(server_id) > 30:
         try:
             import uuid
             # Convert to standard UUID format and extract a numeric portion
@@ -211,7 +211,7 @@ def get_path_components(server_id: str, hostname: str,
     numeric_id = None
     
     # PRIORITY 1: Use explicit original_server_id if provided (most reliable)
-    if original_server_id and str(original_server_id).strip():
+    if original_server_id is not None and str(original_server_id).strip():
         # Only log on first use, not repeated access to avoid spamming logs
         if original_server_id not in get_path_components.logged_ids:
             logger.debug(f"Using provided original_server_id '{original_server_id}' for path construction")

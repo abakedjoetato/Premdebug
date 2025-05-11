@@ -420,7 +420,7 @@ def api_update_stats():
         stat_type = data.get('stat_type')
         stat_data = data.get('stat_data')
         
-        if not discord_guild_id or not server_id or not stat_type or not stat_data:
+        if discord_guild_id is None or not server_id or not stat_type or not stat_data:
             return jsonify({'error': 'Missing required fields'}), 400
         
         # Verify the server exists
@@ -429,7 +429,7 @@ def api_update_stats():
             server_id=server_id
         ).first()
         
-        if not server:
+        if server is None:
             return jsonify({'error': 'Server not found'}), 404
         
         # Update or create the stat

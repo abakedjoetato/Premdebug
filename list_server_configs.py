@@ -95,7 +95,7 @@ async def main():
     logger.info("\nLooking for Emeralds Killfeed servers...")
     
     emerald_servers = await db.servers.find({"original_server_id": "7020"}).to_list(10)
-    if emerald_servers:
+    if emerald_servers is not None:
         logger.info(f"Found {len(emerald_servers)} Emeralds Killfeed servers with original ID 7020")
         for server in emerald_servers:
             logger.info(f"  UUID: {server.get('_id')}")
@@ -105,7 +105,7 @@ async def main():
     else:
         # Try by name
         emerald_servers = await db.servers.find({"name": {"$regex": "Emerald", "$options": "i"}}).to_list(10)
-        if emerald_servers:
+        if emerald_servers is not None:
             logger.info(f"Found {len(emerald_servers)} Emeralds servers by name")
             for server in emerald_servers:
                 logger.info(f"  UUID: {server.get('_id')}")

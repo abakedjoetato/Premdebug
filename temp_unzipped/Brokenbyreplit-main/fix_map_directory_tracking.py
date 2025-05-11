@@ -263,7 +263,7 @@ async def main():
     
     # Connect to database
     db = await connect_to_db()
-    if not db:
+    if db is None:
         logger.error("Failed to connect to database, exiting")
         return False
     
@@ -272,7 +272,7 @@ async def main():
         code_fix_result = await apply_fixes_to_csv_processor()
         
         # Fix database tracking
-        if db:
+        if db is not None:
             db_fix_result = await fix_database_tracking(db)
             historical_reset = await reset_historical_flags(db)
         else:
@@ -280,7 +280,7 @@ async def main():
             historical_reset = False
         
         # Log results
-        if code_fix_result and db_fix_result and historical_reset:
+        if code_fix_result is not None and db_fix_result and historical_reset:
             logger.info("All fixes applied successfully!")
         else:
             logger.warning("Some fixes were not applied successfully")
@@ -292,7 +292,7 @@ async def main():
         return False
     finally:
         # Close database connection
-        if db and hasattr(db, 'client') and hasattr(db.client, 'close'):
+        if db is not None and hasattr(db, 'client') and hasattr(db.client, 'close'):
             await db.client.close()
             logger.info("Closed database connection")
 

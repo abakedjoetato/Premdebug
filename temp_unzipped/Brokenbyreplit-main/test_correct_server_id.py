@@ -74,7 +74,7 @@ async def test_with_correct_server_id():
         logger.info(f"Checking if path exists: {base_path}")
         try:
             result = await sftp_client.isdir(base_path)
-            if result:
+            if result is not None:
                 logger.info(f"Path {base_path} exists!")
             else:
                 logger.warning(f"Path {base_path} does not exist")
@@ -147,7 +147,7 @@ async def test_with_correct_server_id():
                     # Parse events
                     events = csv_parser.parse(content, server_id=SERVER_ID)
                     
-                    if not events:
+                    if events is None:
                         logger.warning(f"No events parsed from {file_path}")
                         continue
                     

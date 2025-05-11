@@ -880,7 +880,7 @@ async def check_tier_access(db, guild_id: Union[str, int, None], required_tier: 
         # Continue with get_guild_premium_tier which has error handling
     
     # If guild doesn't exist, create it automatically using Guild.get_or_create
-    if not guild_exists:
+    if guild_exists is None:
         try:
             from models.guild import Guild
             logger.info(f"Guild not found in database during premium check, creating with get_or_create: {str_guild_id}")
@@ -924,7 +924,7 @@ async def check_tier_access(db, guild_id: Union[str, int, None], required_tier: 
         logger.error(f"Error during direct DB tier check: {e}")
     
     # If direct DB check failed, use the cached approach
-    if not test_direct_db:
+    if test_direct_db is None:
         # Get current premium tier
         current_tier, tier_data = await get_guild_premium_tier(db, str_guild_id)
     

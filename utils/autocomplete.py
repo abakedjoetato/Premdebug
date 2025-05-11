@@ -35,7 +35,7 @@ async def server_id_autocomplete(interaction: discord.Interaction, current: str)
 
     # Get the guild ID
     guild_id = str(interaction.guild_id) if interaction.guild_id else None
-    if not guild_id:
+    if guild_id is None:
         return []
 
     # Get server options from guild configuration
@@ -93,12 +93,12 @@ async def server_autocomplete(interaction: discord.Interaction, current: str) ->
 
         # Try to get servers from database
         guild_data = await bot.db.guilds.find_one({"guild_id": interaction.guild_id})
-        if not guild_data or "servers" not in guild_data:
+        if guild_data is None or "servers" not in guild_data:
             return [app_commands.Choice(name="No servers configured for this guild", value="")]
 
         # Get servers
         servers = guild_data.get("servers", [])
-        if not servers:
+        if servers is None:
             return [app_commands.Choice(name="No servers configured for this guild", value="")]
 
         # Filter servers by current input
@@ -140,7 +140,7 @@ async def get_server_selection(interaction: discord.Interaction, guild_id: str, 
     try:
         # Get the guild document
         guild = await Guild.get_by_guild_id(guild_id, db)
-        if not guild:
+        if guild is None:
             logger.warning(f"Guild document not found for ID {guild_id}")
             return []
 
@@ -150,12 +150,12 @@ async def get_server_selection(interaction: discord.Interaction, guild_id: str, 
         # First add the default server for this guild
         default_server_id = getattr(guild, 'default_server_id', None)
         default_server_name = getattr(guild, 'default_server_name', 'Default Server')
-        if default_server_id:
+        if default_server_id is not None:
             server_options.append((default_server_id, default_server_name))
 
         # Add all configured servers for this guild
         servers = getattr(guild, 'servers', [])
-        if servers and isinstance(servers, list):
+        if servers is not None and isinstance(servers, list):
             for server in servers:
                 # Skip if not a dictionary
                 if not isinstance(server, dict):
@@ -164,18 +164,18 @@ async def get_server_selection(interaction: discord.Interaction, guild_id: str, 
                 server_id = server.get('server_id')
                 server_name = server.get('server_name', 'Unnamed Server')
                 # Only add if not already in the list
-                if server_id and server_id not in [s[0] for s in server_options]:
+                if server_id is not None and server_id not in [s[0] for s in server_options]:
                     server_options.append((server_id, server_name))
 
         # If no servers found directly in guild document, search in server collections
-        if not server_options:
+        if server_options is None:
             # Check for servers associated with this guild in the servers collection
             server_docs = await db.servers.find({"guild_id": guild_id}).to_list(length=25)
             for server in server_docs:
                 server_id = server.get('server_id')
                 server_name = server.get('server_name', 'Unnamed Server')
                 # Only add if not already in the list
-                if server_id and server_id not in [s[0] for s in server_options]:
+                if server_id is not None and server_id not in [s[0] for s in server_options]:
                     server_options.append((server_id, server_name))
 
             # Also check game_servers collection
@@ -184,7 +184,7 @@ async def get_server_selection(interaction: discord.Interaction, guild_id: str, 
                 server_id = server.get('server_id')
                 server_name = server.get('server_name', 'Unnamed Server')
                 # Only add if not already in the list
-                if server_id and server_id not in [s[0] for s in server_options]:
+                if server_id is not None and server_id not in [s[0] for s in server_options]:
                     server_options.append((server_id, server_name))
 
         return server_options
@@ -209,12 +209,12 @@ async def server_autocomplete(interaction: discord.Interaction, current: str) ->
 
     # Get database from the bot
     db = interaction.client.db
-    if not db:
+    if db is None:
         return []
 
     # Query servers for the guild
     guild_id = str(interaction.guild_id) if interaction.guild else None
-    if not guild_id:
+    if guild_id is None:
         return []
 
     server_list = await Server.find_by_guild(db, guild_id)

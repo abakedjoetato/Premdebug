@@ -280,7 +280,7 @@ def validate_guild_server(server_id_param: str = "server_id"):
         async def wrapper(*args, **kwargs):
             # Get server_id from kwargs
             server_id = kwargs.get(server_id_param)
-            if not server_id or server_id == "":
+            if server_id is None or server_id == "":
                 # If server_id not in kwargs, check command args
                 for i, arg in enumerate(args):
                     # Skip self/cog
@@ -294,7 +294,7 @@ def validate_guild_server(server_id_param: str = "server_id"):
                         server_id = str(arg)
                         break
 
-            if not server_id or server_id == "":
+            if server_id is None or server_id == "":
                 logger.warning(f"Cannot validate server: {server_id_param} not found in args or kwargs")
                 return await func(*args, **kwargs)
 
@@ -335,7 +335,7 @@ def validate_guild_server(server_id_param: str = "server_id"):
                     error_callback = send_error
 
             # If we can't determine the command type or context, just run the command
-            if not guild_id or guild_id == "" or db is None:
+            if guild_id is None or guild_id == "" or db is None:
                 return await func(*args, **kwargs)
 
             # Validate server
@@ -596,7 +596,7 @@ def check_server_limit():
                     error_callback = send_error
 
             # If we can't determine the command type or context, just run the command
-            if not guild_id or guild_id == "" or db is None:
+            if guild_id is None or guild_id == "" or db is None:
                 return await func(*args, **kwargs)
 
             # Check server limit
@@ -750,7 +750,7 @@ def command_handler(
                     logger.error(f"Error sending command error message: {e}")
 
             # 1. Check if we're in a guild (if required)
-            if guild_only_command and not guild_id:
+            if guild_only_command is not None and not guild_id:
                 await send_error(messages["dm_context"])
                 return None
 
@@ -773,7 +773,7 @@ def command_handler(
                 COMMAND_COOLDOWNS[user_key] = now
 
             # Skip remaining checks if no guild (already passed guild_only check)
-            if not guild_id or guild_id == "":
+            if guild_id is None or guild_id == "":
                 try:
                     result = await func(*args, **kwargs)
 
@@ -804,9 +804,9 @@ def command_handler(
                     cache_key = f"guild:{guild_id}"
                     guild_model = await guild_cache.get(cache_key)
 
-                    if not guild_model:
+                    if guild_model is None:
                         guild_model = await Guild.get_by_id(db, guild_id)
-                        if guild_model:
+                        if guild_model is not None:
                             await guild_cache.set(cache_key, guild_model)
                 except Exception as e:
                     logger.error(f"Database error getting guild model: {e}")
@@ -816,7 +816,7 @@ def command_handler(
             # Enhanced handling for premium validation
             if premium_feature:
                 # First check if we have a guild model for checking features
-                if guild_model:
+                if guild_model is not None:
                     # If guild_model exists, use the normal validation flow
                     has_access, error_message = await validate_premium_feature(guild_model, premium_feature)
                     if not has_access:
@@ -853,7 +853,7 @@ def command_handler(
                                 try:
                                     # Try to create guild model on-the-fly
                                     guild_model = await Guild.get_or_create(db, guild_id)
-                                    if not guild_model:
+                                    if guild_model is None:
                                         # If still can't create guild, show setup message for server features
                                         await send_error(messages["guild_not_found"])
                                         return None
@@ -870,13 +870,13 @@ def command_handler(
                         # Feature not found in any tier, show guild setup message
                         await send_error(messages["guild_not_found"])
                         return None
-            elif not guild_model:
+            elif guild_model is None:
                 # No premium check but guild model required - show standard error
                 await send_error(messages["guild_not_found"])
                 return None
 
             # 5. Check server limits
-            if check_server_limits:
+            if check_server_limits is not None:
                 has_capacity, error_message = await validate_server_limit(guild_model)
                 if not has_capacity:
                     if error_message:
@@ -884,10 +884,10 @@ def command_handler(
                     return None
 
             # 6. Validate server ID if specified
-            if server_id_param:
+            if server_id_param is not None:
                 # Get server_id from kwargs
                 server_id = kwargs.get(server_id_param)
-                if not server_id or server_id == "":
+                if server_id is None or server_id == "":
                     # If server_id not in kwargs, check command args
                     for i, arg in enumerate(args):
                         # Skip self/code>
@@ -901,7 +901,7 @@ def command_handler(
                             server_id = str(arg)
                             break
 
-                if server_id:
+                if server_id is not None:
                     # Standardize server ID format
                     server_id = standardize_server_id(server_id)
 
@@ -920,7 +920,7 @@ def command_handler(
 
                         # Check server existence
                         server = await get_server_safely(db, server_id, guild_id)
-                        if not server:
+                        if server is None:
                             await send_error(f"Server '{server_id}' not found. Use `/list_servers` to see available servers.")
                             return None
                     except Exception as e:

@@ -82,7 +82,7 @@ def normalize_event_data(event: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dict[str, Any]: Normalized event data with consistent keys
     """
-    if not event:
+    if event is None:
         return {}
         
     # Create a new dict for normalized data

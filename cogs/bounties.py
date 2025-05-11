@@ -59,7 +59,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
             # Safely get database with validation
             try:
                 db = await get_db()
-                if not db or not isinstance(db, DatabaseManager) or not db._connected:
+                if db is None or not isinstance(db, DatabaseManager) or not db._connected:
                     logger.warning("Database not properly initialized, skipping expired bounties check")
                     return
 
@@ -85,7 +85,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
 
             try:
                 db = await get_db()
-                if not db or not isinstance(db, DatabaseManager) or not db._connected:
+                if db is None or not isinstance(db, DatabaseManager) or not db._connected:
                     logger.warning("Database not properly initialized, skipping auto bounties check")
                     return
 
@@ -101,7 +101,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
 
                     # Check if auto-bounties are enabled
                     auto_bounty = guild_data.get("auto_bounty", False)
-                    if not auto_bounty:
+                    if auto_bounty is None:
                         continue
 
                     # Get guild settings from dict
@@ -126,7 +126,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
                         else:
                             server_id = str(server_entry)
 
-                        if not server_id or server_id == "":
+                        if server_id is None or server_id == "":
                             logger.warning(f"Empty server_id found in guild {guild_id}, skipping")
                             continue
                         try:
@@ -225,9 +225,9 @@ class BountiesCog(commands.GroupCog, name="bounty"):
             # Announce the bounty in the configured channel
             # Reuse the existing DB connection
             guild_data = await db.db.guilds.find_one({"guild_id": guild_id})
-            if guild_data:
+            if guild_data is not None:
                 bounty_channel_id = guild_data.get("bounty_channel")
-                if bounty_channel_id:
+                if bounty_channel_id is not None:
                     try:
                         channel = self.bot.get_channel(int(bounty_channel_id))
                         if channel:
@@ -250,7 +250,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
             discord.Embed: The created embed
         """
         # Type safety check
-        if not bounty:
+        if bounty is None:
             logger.error("Attempted to create embed with None bounty")
             # Return a basic error embed
             embed = discord.Embed(
@@ -391,7 +391,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
             guild_id = str(interaction.guild_id)
             guild = await Guild.get_by_guild_id(db, guild_id)
 
-            if not guild:
+            if guild is None:
                 await interaction.followup.send(
                     "Error: Guild not found in database.",
                     ephemeral=True
@@ -415,7 +415,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
             }
             player_data = await db.db.players.find_one(player_query)
 
-            if not player_data:
+            if player_data is None:
                 # Try partial match
                 player_query = {
                     "server_id": server_id,
@@ -423,7 +423,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
                 }
                 player_data = await db.db.players.find_one(player_query)
 
-            if not player_data:
+            if player_data is None:
                 await interaction.followup.send(
                     f"Error: Could not find player with name '{player_name}' on this server.",
                     ephemeral=True
@@ -455,7 +455,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
 
             # Check if user has enough currency
             economy = await Economy.get_by_player(db, discord_id, server_id)
-            if not economy:
+            if economy is None:
                 # Create economy profile if it doesn\'t exist
                 economy = await Economy.create(db, discord_id, server_id)
 
@@ -522,7 +522,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
             bounty_channel_id = None
             if hasattr(guild, "data") and isinstance(guild.data, dict):
                 bounty_channel_id = guild.data.get("bounty_channel")
-            if bounty_channel_id and bounty_channel_id != str(interaction.channel_id):
+            if bounty_channel_id is not None and bounty_channel_id != str(interaction.channel_id):
                 try:
                     channel = self.bot.get_channel(int(bounty_channel_id))
                     if channel:
@@ -569,7 +569,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
             # Get guild data
             guild = await Guild.get_by_guild_id(db, guild_id)
 
-            if not guild:
+            if guild is None:
                 await interaction.followup.send(
                     "Error: Guild not found in database.",
                     ephemeral=True
@@ -652,7 +652,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
             # Get guild data
             guild = await Guild.get_by_guild_id(db, guild_id)
 
-            if not guild:
+            if guild is None:
                 await interaction.followup.send(
                     "Error: Guild not found in database.",
                     ephemeral=True
@@ -786,7 +786,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
 
             # Get guild data
             guild_data = await db.db.guilds.find_one({"guild_id": guild_id})
-            if not guild_data:
+            if guild_data is None:
                 await interaction.followup.send(
                     "Error: Guild not found in database.",
                     ephemeral=True

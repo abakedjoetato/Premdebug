@@ -134,7 +134,7 @@ def test_all_csv_files():
                 results.add_file_result(file_path, len(events))
                 
                 # Log sample event for verification
-                if events:
+                if events is not None:
                     logger.info(f"Sample event: {events[0]}")
                 else:
                     # If no events but file is not empty, mark as empty

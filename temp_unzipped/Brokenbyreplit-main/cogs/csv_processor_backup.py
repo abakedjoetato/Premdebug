@@ -88,7 +88,7 @@ class CSVProcessorCog(commands.Cog):
             server_configs = await self._get_server_configs()
 
             # Skip processing if no SFTP-enabled servers are configured
-            if not server_configs:
+            if server_configs is None:
                 logger.debug("No SFTP-enabled servers configured, skipping CSV processing")
                 return
 
@@ -149,7 +149,7 @@ class CSVProcessorCog(commands.Cog):
                 raw_server_id = server.get("server_id")
                 server_id = standardize_server_id(raw_server_id)
 
-                if not server_id:
+                if server_id is None:
                     logger.warning(f"Invalid server ID format in servers collection: {raw_server_id}, skipping")
                     continue
 
@@ -175,7 +175,7 @@ class CSVProcessorCog(commands.Cog):
                 raw_server_id = server.get("server_id")
                 server_id = standardize_server_id(raw_server_id)
 
-                if not server_id:
+                if server_id is None:
                     logger.warning(f"Invalid server ID format in game_servers collection: {raw_server_id}, skipping")
                     continue
 
@@ -202,7 +202,7 @@ class CSVProcessorCog(commands.Cog):
                 guild_id = guild.get("guild_id")
                 guild_servers = guild.get("servers", [])
 
-                if not guild_servers:
+                if guild_servers is None:
                     continue
 
                 for server in guild_servers:
@@ -213,7 +213,7 @@ class CSVProcessorCog(commands.Cog):
                     raw_server_id = server.get("server_id")
                     server_id = standardize_server_id(raw_server_id)
 
-                    if not server_id:
+                    if server_id is None:
                         continue
 
                     # Skip if we've already processed this server
@@ -234,7 +234,7 @@ class CSVProcessorCog(commands.Cog):
 
             # Final log of all server configurations found
             logger.info(f"Total servers with SFTP config: {len(server_configs)}")
-            if server_configs:
+            if server_configs is not None:
                 logger.info(f"Server IDs found: {list(server_configs.keys())}")
 
         except Exception as e:
@@ -272,7 +272,7 @@ class CSVProcessorCog(commands.Cog):
                 # Get the original_server_id from the document if available,
                 # otherwise use the raw_server_id passed to this method
                 original_server_id = server.get("original_server_id", raw_server_id)
-                if not original_server_id:
+                if original_server_id is None:
                     original_server_id = raw_server_id
 
                 # Log the original server ID being used
@@ -342,7 +342,7 @@ class CSVProcessorCog(commands.Cog):
 
                     # Try to find a numeric ID in server name (which is often in format "Server 7020")
                     server_name = config.get("server_name", "")
-                    if server_name:
+                    if server_name is not None:
                         # Try to extract a numeric ID from the server name
                         for word in str(server_name).split():
                             if word.isdigit() and len(word) >= 4:
@@ -350,7 +350,7 @@ class CSVProcessorCog(commands.Cog):
                                 original_server_id = word
                                 break
 
-                if original_server_id:
+                if original_server_id is not None:
                     logger.debug(f"Using original server ID for path construction: {original_server_id}")
                 else:
                     logger.debug(f"No original numeric server ID found, using UUID for path construction: {server_id}")
@@ -390,7 +390,7 @@ class CSVProcessorCog(commands.Cog):
                 path_server_id = config.get("original_server_id")
 
                 # If no original_server_id, try numeric extraction from hostname
-                if not path_server_id:
+                if path_server_id is None:
                     hostname = config.get("hostname", "")
                     if "_" in hostname:
                         potential_id = hostname.split("_")[-1]
@@ -399,7 +399,7 @@ class CSVProcessorCog(commands.Cog):
                             logger.info(f"Using numeric ID from hostname: {potential_id}")
 
                 # Second attempt: try server name
-                if not path_server_id:
+                if path_server_id is None:
                     server_name = config.get("server_name", "")
                     for word in str(server_name).split():
                         if word.isdigit() and len(word) >= 4:
@@ -408,7 +408,7 @@ class CSVProcessorCog(commands.Cog):
                             break
 
                 # Last resort: use server_id but log warning
-                if not path_server_id:
+                if path_server_id is None:
                     logger.warning(f"No numeric ID found, using server_id as fallback: {server_id}")
                     path_server_id = server_id
 
@@ -937,7 +937,7 @@ class CSVProcessorCog(commands.Cog):
 
         if server_id not in server_configs:
             # Try numeric comparison as fallback if server_id is numeric
-            if server_id and str(server_id).isdigit():
+            if server_id is not None and str(server_id).isdigit():
                 numeric_matches = [sid for sid in server_configs.keys() if str(sid).isdigit() and int(sid) == int(server_id)]
                 if numeric_matches:
                     server_id = numeric_matches[0]
@@ -994,12 +994,12 @@ class CSVProcessorCog(commands.Cog):
         from utils.server_utils import standardize_server_id
 
         # Get server ID from guild config if not provided
-        if not server_id:
+        if server_id is None:
             # Try to get the server ID from the guild's configuration
             try:
                 guild_id = str(interaction.guild_id)
                 guild_doc = await self.bot.db.guilds.find_one({"guild_id": guild_id})
-                if guild_doc and "default_server_id" in guild_doc:
+                if guild_doc is not None and "default_server_id" in guild_doc:
                     raw_server_id = guild_doc["default_server_id"]
                     server_id = standardize_server_id(raw_server_id)
                     logger.info(f"Using default server ID from guild config: {raw_server_id} (standardized to {server_id})")
@@ -1033,7 +1033,7 @@ class CSVProcessorCog(commands.Cog):
 
         if server_id not in server_configs:
             # Try numeric comparison as fallback if server_id is numeric
-            if server_id and str(server_id).isdigit():
+            if server_id is not None and str(server_id).isdigit():
                 numeric_matches = [sid for sid in server_configs.keys() if str(sid).isdigit() and int(sid) == int(server_id)]
                 if numeric_matches:
                     server_id = numeric_matches[0]
@@ -1053,7 +1053,7 @@ class CSVProcessorCog(commands.Cog):
         safe_hours = float(hours) if hours else 24.0
 
         # Safely update last_processed dictionary with server_id
-        if server_id and isinstance(server_id, str):
+        if server_id is not None and isinstance(server_id, str):
             self.last_processed[server_id] = datetime.now() - timedelta(hours=safe_hours)
         else:
             logger.warning(f"Invalid server_id: {server_id}, not updating last_processed timestamp")
@@ -1062,7 +1062,7 @@ class CSVProcessorCog(commands.Cog):
         async with self.processing_lock:
             try:
                 # Process files only if server_id exists in server_configs and it's a non-None string
-                if server_id and isinstance(server_id, str) and server_id in server_configs:
+                if server_id is not None and isinstance(server_id, str) and server_id in server_configs:
                     files_processed, events_processed = await self._process_server_csv_files(
                         server_id, server_configs[server_id]
                     )
@@ -1137,11 +1137,11 @@ class CSVProcessorCog(commands.Cog):
         from utils.server_utils import standardize_server_id
 
         # Get server ID from guild config if not provided
-        if not server_id:
+        if server_id is None:
             try:
                 guild_id = str(interaction.guild_id)
                 guild_doc = await self.bot.db.guilds.find_one({"guild_id": guild_id})
-                if guild_doc and "default_server_id" in guild_doc:
+                if guild_doc is not None and "default_server_id" in guild_doc:
                     raw_server_id = guild_doc["default_server_id"]
                     server_id = standardize_server_id(raw_server_id)
                     logger.info(f"Using default server ID from guild config: {raw_server_id} (standardized to {server_id})")
@@ -1174,7 +1174,7 @@ class CSVProcessorCog(commands.Cog):
 
         if server_id not in server_configs:
             # Try numeric comparison as fallback if server_id is numeric
-            if server_id and str(server_id).isdigit():
+            if server_id is not None and str(server_id).isdigit():
                 numeric_matches = [sid for sid in server_configs.keys() if str(sid).isdigit() and int(sid) == int(server_id)]
                 if numeric_matches:
                     server_id = numeric_matches[0]
@@ -1260,7 +1260,7 @@ class CSVProcessorCog(commands.Cog):
 
             server_list.append(f"• `{server_id}` - Last processed: {last_time}")
 
-        if server_list:
+        if server_list is not None:
             embed.add_field(
                 name="Configured Servers",
                 value="\n".join(server_list),
@@ -1286,7 +1286,7 @@ class CSVProcessorCog(commands.Cog):
         """
         try:
             server_id = event.get("server_id")
-            if not server_id:
+            if server_id is None:
                 logger.warning("Kill event missing server_id, skipping")
                 return False
 
@@ -1399,7 +1399,7 @@ class CSVProcessorCog(commands.Cog):
         # Check if player exists
         player = await Player.get_by_player_id(self.bot.db, player_id)
 
-        if not player:
+        if player is None:
             # Create new player
             player = Player(
                 player_id=player_id,

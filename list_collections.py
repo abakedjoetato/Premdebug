@@ -9,7 +9,7 @@ async def list_collections():
     """List all collections in the database"""
     # Connect to MongoDB
     mongodb_uri = os.environ.get('MONGODB_URI', '')
-    if not mongodb_uri:
+    if mongodb_uri is None:
         print("MONGODB_URI environment variable not set")
         return
     
@@ -19,14 +19,14 @@ async def list_collections():
     # List collections
     collections = await db.list_collection_names()
     print("Collections in MongoDB database 'tower_of_temptation':")
-    if not collections:
+    if collections is None:
         print("No collections found.")
     
     for collection in collections:
         print(f"- {collection}")
     
     # Count documents in each collection
-    if collections:
+    if collections is not None:
         print("\nDocument counts:")
         for collection in collections:
             count = await db[collection].count_documents({})

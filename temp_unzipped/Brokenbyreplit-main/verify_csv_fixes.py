@@ -139,7 +139,7 @@ async def verify_discovery(config: Dict[str, Any]) -> bool:
                                 start_line=0
                             )
                             logger.info(f"    - Parser results: {len(events)} events from {total_lines} lines")
-                            if events:
+                            if events is not None:
                                 logger.info(f"    - First event: {events[0]}")
                         except Exception as parse_error:
                             logger.error(f"    - Parser error: {parse_error}")
@@ -172,7 +172,7 @@ async def verify_discovery(config: Dict[str, Any]) -> bool:
                                 start_line=0
                             )
                             logger.info(f"    - Parser results: {len(events)} events from {total_lines} lines")
-                            if events:
+                            if events is not None:
                                 logger.info(f"    - First event: {events[0]}")
                         except Exception as parse_error:
                             logger.error(f"    - Parser error: {parse_error}")
@@ -194,7 +194,7 @@ async def verify_discovery(config: Dict[str, Any]) -> bool:
                                 start_line=0
                             )
                             logger.info(f"    - Parser results: {len(events)} events from {total_lines} lines")
-                            if events:
+                            if events is not None:
                                 logger.info(f"    - First event: {events[0]}")
                         except Exception as parse_error:
                             logger.error(f"    - Parser error: {parse_error}")
@@ -305,7 +305,7 @@ async def verify_parsing(config: Dict[str, Any]) -> bool:
             # Log the results
             logger.info(f"Parsed {len(events)} events from {total_lines} lines in file: {file_path}")
             
-            if events:
+            if events is not None:
                 success_count += 1
                 # Show the first few events
                 logger.info("Sample parsed events:")

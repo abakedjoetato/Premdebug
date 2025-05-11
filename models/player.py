@@ -211,7 +211,7 @@ class Player(BaseModel):
                     return None
 
             query = {"player_id": player_id}
-            if server_id:
+            if server_id is not None:
                 if not cls._validate_server_id(server_id):
                     logger.error(
                         f"Invalid server_id passed to get_by_player_id: {server_id}"
@@ -229,7 +229,7 @@ class Player(BaseModel):
                 query["server_id"] = server_id
 
             document = await db.players.find_one(query)
-            if document:
+            if document is not None:
                 return cls.from_document(document)
             return None
         except Exception as e:
@@ -383,7 +383,7 @@ class Player(BaseModel):
                     return_document=ReturnDocument.AFTER,
                 )
 
-                if result:
+                if result is not None:
                     self.updated_at = result.get("updated_at", self.updated_at)
                     return True
 
@@ -395,7 +395,7 @@ class Player(BaseModel):
                 {"player_id": self.player_id, "server_id": self.server_id}
             )
 
-            if not current_player:
+            if current_player is None:
                 logger.error(
                     f"Player not found for stats update: {self.player_id} (server: {self.server_id})"
                 )
@@ -436,7 +436,7 @@ class Player(BaseModel):
                 return_document=ReturnDocument.AFTER,
             )
 
-            if result:
+            if result is not None:
                 # Update local object with the new values
                 self.kills = result.get("kills", self.kills)
                 self.deaths = result.get("deaths", self.deaths)
@@ -467,7 +467,7 @@ class Player(BaseModel):
         Returns:
             Player instance or None if document is invalid
         """
-        if not document:
+        if document is None:
             logger.error("Cannot create Player from None document")
             return None
 
@@ -614,7 +614,7 @@ class Player(BaseModel):
             Player object if created/updated, None otherwise
         """
         # CRITICAL FIX: Robust parameter validation and error handling
-        if not db:
+        if db is None:
             logger.error("Database not available for player creation/update")
             return None
 
@@ -630,14 +630,14 @@ class Player(BaseModel):
             safe_name = str(name).strip() if name is not None else None
 
             # Emergency fallbacks if values are still empty after sanitization
-            if not safe_player_id:
+            if safe_player_id is None:
                 logger.error(f"Invalid player_id for create_or_update: {player_id}")
                 import uuid
 
                 safe_player_id = f"recovered_{uuid.uuid4()}"
                 logger.warning(f"Using generated player_id: {safe_player_id}")
 
-            if not safe_server_id:
+            if safe_server_id is None:
                 logger.error(f"Invalid server_id for create_or_update: {server_id}")
                 safe_server_id = "default_server"
                 logger.warning(f"Using default server_id: {safe_server_id}")
@@ -717,7 +717,7 @@ class Player(BaseModel):
                 # Get the updated document
                 updated_doc = await db.players.find_one(query)
 
-                if updated_doc:
+                if updated_doc is not None:
                     # Use the static method to create player from document
                     return cls.from_document(updated_doc)
                 else:
@@ -761,7 +761,7 @@ class Player(BaseModel):
                 while retry_count < max_retries:
                     try:
                         result = await db.players.insert_one(player_data)
-                        if result and result.inserted_id:
+                        if result is not None and result.inserted_id:
                             inserted_id = result.inserted_id
                             logger.debug(f"Successfully created player: {safe_player_id}")
                             break
@@ -804,7 +804,7 @@ class Player(BaseModel):
 
                 # Last retrieval attempt for race condition cases
                 final_doc = await db.players.find_one(query)
-                if final_doc:
+                if final_doc is not None:
                     logger.debug(f"Retrieved player after race condition: {safe_player_id}")
                     return cls.from_document(final_doc)
 
@@ -891,7 +891,7 @@ class Player(BaseModel):
         cursor = db.players.find({"server_id": server_id})
         async for document in cursor:
             player = cls.from_document(document)
-            if player:
+            if player is not None:
                 players.append(player)
         return players
 
@@ -978,7 +978,7 @@ class Player(BaseModel):
                 return_document=ReturnDocument.AFTER
             )
 
-            if result:
+            if result is not None:
                 # Update the local object.
                 self.times_map_loaded = result.get('times_map_loaded', self.times_map_loaded)
                 self.updated_at = result.get('updated_at', self.updated_at)

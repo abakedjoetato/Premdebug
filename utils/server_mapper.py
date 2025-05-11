@@ -64,7 +64,7 @@ class ServerMapper:
             if self.db:
                 server_map = await self._get_server_mapping(uuid)
                 
-                if server_map and "original_id" in server_map:
+                if server_map is not None and "original_id" in server_map:
                     # Cache the result
                     self.cache[uuid] = server_map["original_id"]
                     self.cache_expiry[uuid] = datetime.now().timestamp() + self.cache_ttl
@@ -74,7 +74,7 @@ class ServerMapper:
             if self.db and (hostname or server_name):
                 # Look for server with matching hostname or name but different UUID
                 server_id = await self._find_server_by_characteristics(uuid, hostname, server_name)
-                if server_id:
+                if server_id is not None:
                     # Save the mapping for future reference
                     await self._save_server_mapping(uuid, server_id, hostname, server_name)
                     
@@ -137,7 +137,7 @@ class ServerMapper:
             return True
             
         # Check server name
-        if server_name and 'tower' in server_name.lower() and 'temptation' in server_name.lower():
+        if server_name is not None and 'tower' in server_name.lower() and 'temptation' in server_name.lower():
             return True
             
         return False
@@ -163,12 +163,12 @@ class ServerMapper:
             
             # Check in servers collection
             server = await self.db.servers.find_one({"_id": uuid})
-            if server and "original_id" in server:
+            if server is not None and "original_id" in server:
                 return {"uuid": uuid, "original_id": server["original_id"]}
                 
             # Check in game_servers collection
             game_server = await self.db.game_servers.find_one({"server_id": uuid})
-            if game_server and "original_id" in game_server:
+            if game_server is not None and "original_id" in game_server:
                 return {"uuid": uuid, "original_id": game_server["original_id"]}
                 
             return None
@@ -202,7 +202,7 @@ class ServerMapper:
             query = {"_id": {"$ne": uuid}}
             if hostname:
                 query["hostname"] = hostname
-            if server_name:
+            if server_name is not None:
                 # Try exact match and partial match
                 query["$or"] = [
                     {"name": server_name},
@@ -210,7 +210,7 @@ class ServerMapper:
                 ]
                 
             server = await self.db.servers.find_one(query)
-            if server and "original_id" in server:
+            if server is not None and "original_id" in server:
                 logger.info(f"Found server with matching characteristics: {server['_id']} -> {server['original_id']}")
                 return server["original_id"]
                 
@@ -218,14 +218,14 @@ class ServerMapper:
             game_query = {"server_id": {"$ne": uuid}}
             if hostname:
                 game_query["hostname"] = hostname
-            if server_name:
+            if server_name is not None:
                 game_query["$or"] = [
                     {"name": server_name},
                     {"name": {"$regex": re.escape(server_name), "$options": "i"}}
                 ]
                 
             game_server = await self.db.game_servers.find_one(game_query)
-            if game_server and "original_id" in game_server:
+            if game_server is not None and "original_id" in game_server:
                 logger.info(f"Found game server with matching characteristics: {game_server['server_id']} -> {game_server['original_id']}")
                 return game_server["original_id"]
                 
