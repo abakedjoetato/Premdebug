@@ -18,7 +18,7 @@ class Guild(BaseModel):
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert Guild object to dictionary
-        
+
         Returns:
             Dict containing all guild data
         """
@@ -87,18 +87,18 @@ class Guild(BaseModel):
         """
         if server_data is None or server_data.get("server_id") is None or server_data.get("server_id") == "":
             return False
-            
+
         # CRITICAL FIX: Ensure original_server_id is ALWAYS a numeric ID for path construction
         # This is the most important part of the solution to the UUID path issue
         server_id = server_data.get("server_id")
         original_server_id = server_data.get("original_server_id")
         hostname = server_data.get("hostname", server_data.get("sftp_host", ""))
         server_name = server_data.get("server_name", "")
-        
+
         # Import server_identity for consistent ID resolution
         try:
             from utils.server_identity import identify_server, KNOWN_SERVERS
-            
+
             # 1. Priority 1: Check KNOWN_SERVERS for both server_id and original_server_id
             if server_id in KNOWN_SERVERS:
                 numeric_id = KNOWN_SERVERS[server_id]
@@ -108,12 +108,12 @@ class Guild(BaseModel):
                 numeric_id = KNOWN_SERVERS[original_server_id]
                 logger.info(f"Using known numeric ID '{numeric_id}' from KNOWN_SERVERS for original_server_id {original_server_id}")
                 server_data["original_server_id"] = numeric_id
-                
+
             # 2. Priority 2: If original_server_id is provided and is numeric, use it directly
             elif original_server_id is not None and str(original_server_id).isdigit():
                 logger.info(f"Using existing numeric original_server_id: {original_server_id}")
                 # Keep existing value - already set
-                
+
             # 3. Priority 3: Extract from server name (often contains numeric IDs)
             elif server_name is not None:
                 # Look for numeric ID in server name (common pattern: "Server 7020" or "EU 7020")
@@ -124,7 +124,7 @@ class Guild(BaseModel):
                         server_data["original_server_id"] = word
                         found = True
                         break
-                        
+
                 # 4. Priority 4: Try server_identity resolution if nothing found in server name
                 if not found:
                     numeric_id, is_known = identify_server(
@@ -133,12 +133,12 @@ class Guild(BaseModel):
                         server_name=server_name,
                         guild_id=self.guild_id
                     )
-                    
+
                     if numeric_id:
                         logger.info(f"Using identified numeric ID '{numeric_id}' from server_identity module")
                         server_data["original_server_id"] = numeric_id
                         found = True
-                        
+
                 # 5. Priority 5: Extract digits from server_id as last resort
                 if not found and server_id:
                     # Get numeric part of UUID if possible
@@ -153,7 +153,7 @@ class Guild(BaseModel):
                         fallback_id = str(random.randint(10000, 99999))
                         logger.error(f"Could not determine any numeric ID, using random fallback: {fallback_id}")
                         server_data["original_server_id"] = fallback_id
-            
+
             # 6. Catch-all for any case where we still don't have an original_server_id
             if "original_server_id" not in server_data or not server_data["original_server_id"]:
                 # Last attempt with server_identity
@@ -163,7 +163,7 @@ class Guild(BaseModel):
                     server_name="", 
                     guild_id=self.guild_id
                 )
-                
+
                 if numeric_id:
                     logger.info(f"Final attempt: using identified numeric ID '{numeric_id}'")
                     server_data["original_server_id"] = numeric_id
@@ -173,7 +173,7 @@ class Guild(BaseModel):
                     fallback_id = str(random.randint(10000, 99999))
                     logger.error(f"No valid numeric ID could be found, using random fallback: {fallback_id}")
                     server_data["original_server_id"] = fallback_id
-                    
+
         except ImportError as e:
             logger.error(f"Failed to import server_identity, using basic fallback: {e}")
             # Simple fallback if server_identity can't be imported
@@ -189,7 +189,7 @@ class Guild(BaseModel):
                         uuid_digits = ''.join(filter(str.isdigit, str(server_id)))
                         extracted_id = uuid_digits[-5:] if len(uuid_digits) >= 5 else uuid_digits
                         server_data["original_server_id"] = extracted_id or server_id
-                
+
         logger.info(f"Adding server with server_id={server_data.get('server_id')} and original_server_id={server_data.get('original_server_id')}")
 
         # Add server to list
@@ -206,14 +206,14 @@ class Guild(BaseModel):
                 }
             }
         )
-        
+
         # IMPORTANT: Also save to servers collection for CSV processor
         # This ensures the server is found by the historical parser
         try:
             # Make sure sftp_enabled is set for servers with SFTP credentials
             if all(key in server_data for key in ["sftp_host", "sftp_username", "sftp_password"]):
                 server_data["sftp_enabled"] = True
-                
+
             # Save to servers collection (used by CSV processor)
             server_result = await self.db.servers.update_one(
                 {"server_id": server_data["server_id"]},
@@ -221,7 +221,7 @@ class Guild(BaseModel):
                 upsert=True  # Create if doesn't exist
             )
             logger.info(f"Added server to 'servers' collection: {server_data['server_id']}, upsert={server_result.upserted_id is not None}")
-            
+
             # Also save to game_servers collection for better compatibility
             game_server_result = await self.db.game_servers.update_one(
                 {"server_id": server_data["server_id"]},
@@ -247,43 +247,43 @@ class Guild(BaseModel):
         if not hasattr(self, 'db') or not self.db:
             # If no database connection, use application-level removal only
             logger.warning("No database connection available for Guild.remove_server")
-            
+
             # Import standardize_server_id here to avoid circular imports
             from utils.server_utils import standardize_server_id
-            
+
             # Standardize the server_id to ensure consistent formatting
             standardized_server_id = standardize_server_id(server_id)
-            
+
             # Memory-only removal from servers array
             if hasattr(self, 'servers') and self.servers:
                 before_count = len(self.servers)
                 self.servers = [s for s in self.servers if standardize_server_id(s.get("server_id")) != standardized_server_id]
                 after_count = len(self.servers)
                 return before_count > after_count
-            
+
             return False
 
         # Import standardize_server_id here to avoid circular imports
         from utils.server_utils import standardize_server_id
-        
+
         # Standardize the server_id to ensure consistent formatting
         standardized_server_id = standardize_server_id(server_id)
         str_server_id = str(server_id) if server_id is not None else ""
-        
+
         if standardized_server_id is None:
             logger.warning(f"Invalid server_id format for removal: {server_id}")
             return False
-            
+
         # Log server information before removal for debugging
         logger.info(f"Removing server with ID from guild {self.guild_id}:")
         logger.info(f"  - Raw server_id: {server_id}, Type: {type(server_id)}")
         logger.info(f"  - String repr: {str_server_id}")
         logger.info(f"  - Standardized: {standardized_server_id}")
-        
+
         # Make sure servers is initialized
         if not hasattr(self, 'servers') or self.servers is None:
             self.servers = []
-            
+
         # Log all existing servers for debugging
         logger.info(f"Current servers in guild {self.guild_id}:")
         for i, s in enumerate(self.servers):
@@ -291,7 +291,7 @@ class Guild(BaseModel):
             s_name = s.get("server_name", "Unknown")
             std_id = standardize_server_id(s_id)
             logger.info(f"  - Server {i}: ID={s_id}, StdID={std_id}, Name={s_name}, Type={type(s_id)}")
-        
+
         # First try exact match
         found_exact = False
         for s in self.servers:
@@ -299,10 +299,10 @@ class Guild(BaseModel):
                 found_exact = True
                 logger.info(f"Found exact match for server ID {standardized_server_id}")
                 break
-                
+
         # Find and remove server from guild.servers, using standardized comparison
         original_server_count = len(self.servers)
-        
+
         # Try different matching approaches if needed
         if found_exact:
             # Use exact matching first
@@ -311,12 +311,12 @@ class Guild(BaseModel):
             # Try case-insensitive standardized matching
             logger.info(f"No exact match found, using standardized comparison")
             self.servers = [s for s in self.servers if standardize_server_id(s.get("server_id")) != standardized_server_id]
-            
+
             # Also try direct string comparison with raw server_id
             if len(self.servers) == original_server_count:
                 logger.info(f"No matches with standardized comparison, trying raw string comparison")
                 self.servers = [s for s in self.servers if str(s.get("server_id")) != str_server_id]
-            
+
             # Last resort: try numeric comparison if server_id is numeric
             if standardized_server_id.isdigit() and len(self.servers) == original_server_count:
                 logger.info(f"No matches with string comparison, trying numeric comparison")
@@ -324,14 +324,14 @@ class Guild(BaseModel):
                 self.servers = [s for s in self.servers if (
                     not str(s.get("server_id")).isdigit() or int(s.get("server_id")) != numeric_id
                 )]
-        
+
         servers_removed = original_server_count - len(self.servers)
-        
+
         if servers_removed > 0:
             logger.info(f"Removed {servers_removed} server entries from guild.servers array")
         else:
             logger.warning(f"No servers matched {standardized_server_id} in guild.servers array")
-            
+
         self.updated_at = datetime.utcnow()
 
         # Update guild in database
@@ -344,15 +344,15 @@ class Guild(BaseModel):
                 }
             }
         )
-        
+
         # Try multiple approaches to remove from standalone servers collection
         # 1. First try exact match
         standalone_exact = await self.db.servers.delete_many({"server_id": standardized_server_id})
-        
+
         # 2. Try case-insensitive regex match
         standalone_query = {"server_id": {"$regex": f"^{standardized_server_id}$", "$options": "i"}}
         standalone_result = await self.db.servers.delete_many(standalone_query)
-        
+
         # 3. If server ID is numeric, try numeric match
         standalone_numeric = 0
         if standardized_server_id.isdigit():
@@ -362,15 +362,15 @@ class Guild(BaseModel):
                 standalone_numeric = numeric_result.deleted_count
             except:
                 pass
-                
+
         # Similar approaches for game_servers collection
         # 1. Exact match
         game_exact = await self.db.game_servers.delete_many({"server_id": standardized_server_id})
-        
+
         # 2. Case-insensitive match
         game_servers_query = {"server_id": {"$regex": f"^{standardized_server_id}$", "$options": "i"}}
         game_regex = await self.db.game_servers.delete_many(game_servers_query)
-        
+
         # 3. Numeric match if applicable
         game_numeric = 0
         if standardized_server_id.isdigit():
@@ -380,11 +380,11 @@ class Guild(BaseModel):
                 game_numeric = numeric_result.deleted_count
             except:
                 pass
-        
+
         # Combine all deletion counts
         standalone_count = standalone_exact.deleted_count + standalone_result.deleted_count + standalone_numeric
         game_count = game_exact.deleted_count + game_regex.deleted_count + game_numeric
-        
+
         # Log detailed deletion results
         logger.info(f"Server removal results - Guild: {guild_result.modified_count}")
         logger.info(f"Servers collection - Exact: {standalone_exact.deleted_count}, Regex: {standalone_result.deleted_count}, Numeric: {standalone_numeric}")
@@ -394,7 +394,7 @@ class Guild(BaseModel):
 
     async def get_server(self, server_id: Union[str, int, None]) -> Optional[Dict[str, Any]]:
         """Get a server by ID
-        
+
         This method ensures server_id is always treated as a string
         for consistent comparisons, following the standardized approach.
 
@@ -407,33 +407,33 @@ class Guild(BaseModel):
         # Use the standardize_server_id function from server_utils
         # for consistent handling across the codebase
         from utils.server_utils import standardize_server_id
-        
+
         # Standardize server ID
         str_server_id = standardize_server_id(server_id)
         if str_server_id is None or str_server_id == "":
             logger.warning(f"Invalid server_id provided to get_server: {server_id}")
             return None
-        
+
         # Check servers list exists and is actually a list
         if not hasattr(self, 'servers') or not isinstance(self.servers, list):
             logger.warning(f"Guild {self.guild_id} has no servers attribute or it is not a list")
             return None
-            
+
         # Check each server with consistent string conversion
         for server in self.servers:
             if not isinstance(server, dict):
                 logger.warning(f"Non-dict server entry found in guild {self.guild_id}: {type(server)}")
                 continue
-                
+
             # Get server_id with fallback to empty string if missing
             server_id_value = server.get("server_id", "")
             if server_id_value is None:
                 continue
-                
+
             # Always compare as strings with consistent handling
             if standardize_server_id(server_id_value) == str_server_id:
                 return server
-                
+
         return None
 
     def get_max_servers(self) -> int:
@@ -455,13 +455,13 @@ class Guild(BaseModel):
         """
         # CRITICAL FIX: Enhanced logging and more robust guild ID handling
         logger.info(f"[GUILD_DEBUG] Looking up guild by ID: {guild_id}, type: {type(guild_id).__name__}")
-        
+
         # CRITICAL FIX: Handle guild_id conversion more robustly
         try:
             if guild_id is None:
                 logger.warning("[GUILD_DEBUG] Attempted to get guild with None guild_id")
                 return None
-                
+
             # Standardize guild_id to string format
             if isinstance(guild_id, int):
                 string_guild_id = str(guild_id)
@@ -473,35 +473,35 @@ class Guild(BaseModel):
                 # Handle other types safely
                 string_guild_id = str(guild_id)
                 logger.warning(f"[GUILD_DEBUG] Converted unexpected guild_id type {type(guild_id).__name__} to string: {string_guild_id}")
-                
+
             if not string_guild_id:
                 logger.warning("[GUILD_DEBUG] Empty guild_id after conversion")
                 return None
         except Exception as e:
             logger.error(f"[GUILD_DEBUG] Error converting guild_id: {e}")
             return None
-            
+
         try:
             # CRITICAL FIX: Try multiple query approaches if needed
             document = None
-            
+
             # Approach 1: Direct string match (most common case)
             document = await db.guilds.find_one({"guild_id": string_guild_id})
-            
+
             # Approach 2: If not found and guild_id is numeric, try integer match
             if document is None and string_guild_id.isdigit():
                 logger.info(f"[GUILD_DEBUG] Trying numeric lookup for guild_id: {string_guild_id}")
                 document = await db.guilds.find_one({"guild_id": int(string_guild_id)})
-                
+
             # Approach 3: Case-insensitive regex match as last resort
             if document is None:
                 logger.info(f"[GUILD_DEBUG] Trying case-insensitive lookup for guild_id: {string_guild_id}")
                 document = await db.guilds.find_one({"guild_id": {"$regex": f"^{string_guild_id}$", "$options": "i"}})
-                
+
             if document is not None:
                 logger.info(f"[GUILD_DEBUG] Found guild document for guild_id: {string_guild_id}")
                 guild = cls.create_from_db_document(document, db)
-                
+
                 # CRITICAL FIX: Verify the returned guild has the expected premium_tier
                 if guild and hasattr(guild, 'premium_tier'):
                     logger.info(f"[GUILD_DEBUG] Guild {string_guild_id} premium_tier: {guild.premium_tier}, type: {type(guild.premium_tier).__name__}")
@@ -537,7 +537,7 @@ class Guild(BaseModel):
 
         # Log the tier change
         logger.info(f"Setting premium tier for guild {self.guild_id}: {self.premium_tier} -> {tier_int}")
-            
+
         # Set tier in model
         self.premium_tier = tier_int
         self.updated_at = datetime.utcnow()
@@ -551,13 +551,13 @@ class Guild(BaseModel):
                     "updated_at": self.updated_at
                 }}
             )
-            
+
             success = result.modified_count > 0
             if success:
                 logger.info(f"Successfully updated premium tier for guild {self.guild_id} to {tier_int}")
             else:
                 logger.warning(f"Failed to update premium tier for guild {self.guild_id}, no documents modified")
-                
+
             return success
         except Exception as e:
             logger.error(f"Error updating premium tier: {e}")
@@ -659,7 +659,7 @@ class Guild(BaseModel):
         """
         # Timestamp for the update
         update_timestamp = datetime.utcnow()
-        
+
         # Create the update dictionary with only the fields to update
         # This avoids including color fields that might have non-datetime values
         update_dict = {}
@@ -676,6 +676,7 @@ class Guild(BaseModel):
 
         if color_accent is not None:
             self.color_accent = color_accent
+
             update_dict["color_accent"] = color_accent
 
         if icon_url is not None:
@@ -696,59 +697,59 @@ class Guild(BaseModel):
     @classmethod
     async def get_by_id(cls, db, guild_id) -> Optional['Guild']:
         """Get a guild by its Discord ID (alias for get_by_guild_id)
-        
+
         Args:
             db: Database connection
             guild_id: Discord guild ID (will be converted to string)
-            
+
         Returns:
             Guild object or None if not found
         """
         # This method is an alias that ensures backward compatibility
         # While ensuring the same type safety as get_by_guild_id
         return await cls.get_by_guild_id(db, guild_id)
-        
+
     @classmethod
     async def get_guild(cls, db, guild_id) -> Optional['Guild']:
         """Get a guild by its Discord ID (alias for get_by_id)
-        
+
         This method is used throughout the codebase for consistency.
-        
+
         Args:
             db: Database connection
             guild_id: Discord guild ID (will be converted to string)
-            
+
         Returns:
             Guild object or None if not found
         """
         return await cls.get_by_id(db, guild_id)
-        
+
     @classmethod
     async def get_or_create(cls, db, guild_id, guild_name: Optional[str] = None) -> Optional['Guild']:
         """Get an existing guild or create a new one if it doesn\'t exist
-        
+
         This is particularly useful for premium validation where we might need
         a guild model without requiring complete setup.
-        
+
         Args:
             db: Database connection 
             guild_id: Discord guild ID (will be converted to string)
             guild_name: Optional guild name to use if creating a new guild (defaults to "Guild {guild_id}")
-            
+
         Returns:
             Guild object or None if retrieval/creation failed
         """
         # First try to get the existing guild
         guild = await cls.get_by_id(db, guild_id)
-        
+
         # If guild exists, return it directly
         if guild is not None:
             return guild
-            
+
         # Otherwise create a new guild with basic information
         if guild_name is None:
             guild_name = f"Guild {guild_id}"
-            
+
         # Create the guild with minimal setup
         try:
             logger.info(f"Auto-creating guild during feature access: {guild_id}")
@@ -791,7 +792,7 @@ class Guild(BaseModel):
 
     def check_feature_access(self, feature_name: str) -> bool:
         """Check if this guild has access to a premium feature
-        
+
         This comprehensive method implements proper tier inheritance, ensuring that
         higher tiers have access to all features from lower tiers. It checks
         feature access using multiple methods to ensure reliability.
@@ -808,12 +809,12 @@ class Guild(BaseModel):
         # CRITICAL FIX: Add detailed diagnostic logging
         guild_id = getattr(self, 'guild_id', 'unknown')
         logger.info(f"[TIER_DEBUG] Guild {guild_id}: Checking feature access for '{feature_name}', raw premium_tier={self.premium_tier}, type={type(self.premium_tier).__name__}")
-        
+
         # EMERGENCY DIRECT DB CHECK: This is a crucial immediate fix that bypasses all caching and object issues
         # For the most reliable results, check the database directly first
         direct_db_tier = None
         try:
-            if hasattr(self, 'db') and self.db and hasattr(self, 'guild_id') and self.guild_id:
+            if hasattr(self, 'db') and self.db is not None and hasattr(self, 'guild_id') and self.guild_id:
                 import asyncio
                 if asyncio.get_event_loop().is_running():
                     # This will run a direct DB check in the background
@@ -832,14 +833,14 @@ class Guild(BaseModel):
                             except Exception as e:
                                 logger.error(f"[TIER_DEBUG] Error in direct DB tier check: {e}")
                             return None
-                            
+
                     try:
                         # Try to get the tier directly, with a short timeout
                         direct_db_tier = asyncio.run_coroutine_threadsafe(
                             DirectDbCheck.get_tier(self.db, self.guild_id), 
                             asyncio.get_event_loop()
                         ).result(0.5)  # Half second timeout
-                        
+
                         if direct_db_tier is not None:
                             logger.info(f"[TIER_DEBUG] Successfully retrieved direct DB tier: {direct_db_tier}")
                     except (asyncio.TimeoutError, concurrent.futures.TimeoutError):
@@ -848,7 +849,7 @@ class Guild(BaseModel):
                         logger.error(f"[TIER_DEBUG] Error running direct DB check: {e}")
         except Exception as e:
             logger.error(f"[TIER_DEBUG] Error setting up direct DB check: {e}")
-            
+
         # CRITICAL FIX: If we got a direct DB tier, and it's higher than what's in the object, use it
         if direct_db_tier is not None and (
             # Use direct DB tier if it's higher than the object's tier
@@ -867,7 +868,7 @@ class Guild(BaseModel):
         ):
             logger.info(f"[TIER_DEBUG] Using higher direct DB tier: {direct_db_tier} instead of object tier: {getattr(self, 'premium_tier', None)}")
             premium_tier = direct_db_tier
-            
+
             # Also update the object's tier for future checks in this session
             try:
                 self.premium_tier = direct_db_tier
@@ -897,12 +898,12 @@ class Guild(BaseModel):
             except Exception as e:
                 logger.error(f"[TIER_DEBUG] Error processing premium_tier: {e}, defaulting to 0")
                 premium_tier = 0
-        
+
         # CRITICAL FIX: Special handling for tier 4 (highest tier) - always grant access to all features
         if premium_tier >= 4:
             logger.info(f"[TIER_DEBUG] Automatic access granted to '{feature_name}' for guild {guild_id} with tier {premium_tier} (highest tier)")
             return True
-        
+
         # CRITICAL FIX: Special handling for 'stats' feature - this is a commonly used feature
         # that should be available for tier 1 or higher
         if feature_name in ['stats', 'basic_stats', 'leaderboards']:
@@ -911,7 +912,7 @@ class Guild(BaseModel):
             logger.info(f"[TIER_DEBUG] Special case for '{feature_name}': tier {premium_tier} >= required {min_tier_required}? {has_access}")
             if has_access:
                 return True
-        
+
         # Method 1: Check using direct PREMIUM_FEATURES mapping (most efficient)
         # This implements tier inheritance by checking if current tier >= required tier
         if feature_name in PREMIUM_FEATURES:
@@ -920,10 +921,10 @@ class Guild(BaseModel):
             logger.info(f"[TIER_DEBUG] Feature check via PREMIUM_FEATURES: feature '{feature_name}' requires tier {min_tier_required}, guild {guild_id} has tier {premium_tier}, access: {has_access}")
             if has_access:
                 return True
-        
+
         # Method 2: Check using inherited features from all tiers up to and including current tier
         all_features = []
-        
+
         # Gather features from all tiers up to and including the current tier
         # This implements tier inheritance by explicitly collecting features from all lower tiers
         for tier_level in range(premium_tier + 1):
@@ -933,26 +934,26 @@ class Guild(BaseModel):
                 for feature in tier_features:
                     if feature not in all_features:
                         all_features.append(feature)
-        
+
         logger.info(f"[TIER_DEBUG] Guild {guild_id}: Available features after tier inheritance (0 to {premium_tier}): {all_features}")
         has_access = feature_name in all_features
         logger.info(f"[TIER_DEBUG] Guild {guild_id} access to '{feature_name}': {has_access}")
-        
+
         return has_access
 
     def get_available_features(self) -> List[str]:
         """
         Get list of features available for this guild's premium tier.
-        
+
         This method ensures higher tiers have access to all features from lower tiers,
         implementing a comprehensive tier inheritance system.
         """
         from config import PREMIUM_TIERS
         from utils.premium import PREMIUM_FEATURES
-        
+
         # DEBUG: Add more detailed logging to track premium tier values
         logger.info(f"PREMIUM DEBUG: Raw premium_tier value: '{self.premium_tier}', type: {type(self.premium_tier)}")
-        
+
         # Make sure premium_tier is an integer (fix for potential string storage issue)
         try:
             # First check direct numeric conversion
@@ -968,15 +969,15 @@ class Guild(BaseModel):
             else:
                 # Last resort, try direct conversion
                 premium_tier = int(self.premium_tier)
-                
+
             logger.info(f"PREMIUM DEBUG: Converted premium_tier: {premium_tier}")
         except (ValueError, TypeError) as e:
             logger.warning(f"Invalid premium_tier value in get_available_features: {self.premium_tier}, error: {str(e)}, defaulting to 0")
             premium_tier = 0
-        
+
         # Initialize feature list with all features accessible at this tier level
         all_features = []
-        
+
         # Method 1: Collect features from all tiers up to and including this tier
         # This ensures proper tier inheritance - higher tiers include all features from lower tiers
         for tier_level in range(premium_tier + 1):
@@ -986,15 +987,15 @@ class Guild(BaseModel):
                 for feature in tier_features:
                     if feature not in all_features:
                         all_features.append(feature)
-        
+
         # If no features were found via tier inheritance, use tier 0 as fallback
         if not all_features:
             logger.warning(f"No tier info found for any tier up to {premium_tier} in get_available_features, using tier 0 as fallback")
             tier_info = PREMIUM_TIERS.get(0, {})
             all_features = tier_info.get("features", [])
-        
+
         logger.info(f"PREMIUM DEBUG: Features from tier inheritance (0 to {premium_tier}): {all_features}")
-        
+
         # Method 2: Supplement with direct feature minimum tier mapping
         # This is a backup approach to ensure all features are included
         supplemental_features = []
@@ -1003,49 +1004,49 @@ class Guild(BaseModel):
                 # Only add if not already in the list
                 if feature not in all_features:
                     supplemental_features.append(feature)
-        
+
         if supplemental_features:
             logger.info(f"PREMIUM DEBUG: Additional features from PREMIUM_FEATURES: {supplemental_features}")
             all_features.extend(supplemental_features)
-        
+
         # Ensure no duplicate features
         unique_features = list(set(all_features))
         logger.info(f"PREMIUM DEBUG: Final feature set for tier {premium_tier}: {unique_features}")
-            
+
         return unique_features
 
     @classmethod
     def create_from_db_document(cls, document: Dict[str, Any], db=None) -> Optional['Guild']:
         """Create a Guild instance from a database document with db connection
-        
+
         This is a custom method specifically for Guild to handle db parameter.
         Unlike BaseModel.from_document, this accepts a db connection parameter.
-        
+
         Args:
             document: MongoDB document
             db: Database connection
-            
+
         Returns:
             Guild instance or None if document is None
         """
         if document is None:
             return None
-        
+
         # CRITICAL FIX: Enhance logging for document inspection
         guild_id = document.get('guild_id', 'unknown')
         logger.info(f"[TIER_DEBUG] Creating Guild instance for guild_id={guild_id}, document keys: {list(document.keys())}")
-        
+
         # Extract and properly convert premium_tier to int before initializing
         # This ensures premium tier is always stored as an integer
         document_copy = document.copy()
-        
+
         # Handle premium_tier conversion specifically with enhanced logging and validation
         if 'premium_tier' in document_copy:
             try:
                 # Convert premium_tier to integer with more detailed logging
                 premium_tier_value = document_copy['premium_tier']
                 logger.info(f"[TIER_DEBUG] Guild {guild_id}: Raw premium_tier from DB: {premium_tier_value}, type: {type(premium_tier_value).__name__}")
-                
+
                 if premium_tier_value is not None:
                     # CRITICAL FIX: More robust type conversion with validation
                     if isinstance(premium_tier_value, int):
@@ -1064,12 +1065,12 @@ class Guild(BaseModel):
                         except (ValueError, TypeError) as e:
                             logger.error(f"[TIER_DEBUG] Guild {guild_id}: Failed to convert premium_tier '{premium_tier_value}' to integer: {e}")
                             premium_tier_int = 0
-                    
+
                     # CRITICAL FIX: Validate tier range (0-5) for additional safety
                     if premium_tier_int < 0 or premium_tier_int > 5:
                         logger.warning(f"[TIER_DEBUG] Guild {guild_id}: premium_tier {premium_tier_int} out of valid range (0-5), clamping")
                         premium_tier_int = max(0, min(5, premium_tier_int))
-                        
+
                     # Set the validated integer value
                     document_copy['premium_tier'] = premium_tier_int
                     logger.info(f"[TIER_DEBUG] Guild {guild_id}: Final premium_tier set to {premium_tier_int}")
@@ -1084,45 +1085,45 @@ class Guild(BaseModel):
             # If no premium_tier in document, default to 0
             document_copy['premium_tier'] = 0
             logger.warning(f"[TIER_DEBUG] Guild {guild_id}: No premium_tier found in database document, defaulting to 0")
-            
+
         # CRITICAL FIX: Verify premium_tier value after conversion
         logger.info(f"[TIER_DEBUG] Guild {guild_id}: Final premium_tier in document_copy: {document_copy['premium_tier']}, type: {type(document_copy['premium_tier']).__name__}")
-            
+
         instance = cls(db, **document_copy)
-        
+
         # CRITICAL FIX: Perform final validation on the created instance
         if hasattr(instance, 'premium_tier'):
             logger.info(f"[TIER_DEBUG] Guild {guild_id}: Instance premium_tier after creation: {instance.premium_tier}, type: {type(instance.premium_tier).__name__}")
-            
+
             # Force int conversion one more time to ensure consistency
             try:
                 instance.premium_tier = int(instance.premium_tier)
                 logger.info(f"[TIER_DEBUG] Guild {guild_id}: Final instance premium_tier: {instance.premium_tier}")
             except (ValueError, TypeError) as e:
                 logger.error(f"[TIER_DEBUG] Guild {guild_id}: Error in final premium_tier validation: {e}")
-        
+
         # Ensure all IDs are strings for consistent handling
         if hasattr(instance, 'guild_id'):
             instance.guild_id = str(instance.guild_id)
         if hasattr(instance, 'admin_role_id') and instance.admin_role_id is not None:
             instance.admin_role_id = str(instance.admin_role_id)
-            
+
         return instance
-        
+
     @classmethod
     def from_document(cls, document: Dict[str, Any]) -> Optional['Guild']:
         """Create a Guild instance from a database document
-        
+
         Overrides BaseModel.from_document to maintain compatibility.
         This method doesn't include a db parameter to match the BaseModel signature.
-        
+
         Args:
             document: MongoDB document
-            
+
         Returns:
             Guild instance or None if document is None (matching BaseModel contract)
         """
         if document is None:
             return None
-            
+
         return cls.create_from_db_document(document, None)

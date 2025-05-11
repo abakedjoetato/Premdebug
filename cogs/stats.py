@@ -1048,7 +1048,10 @@ class Stats(commands.Cog):
             for i, entry in enumerate(leaderboard_data):
                 # Use numbers instead of emoji medals for a cleaner look
                 position = f"#{i+1}"
-                leaderboard_str += f"{position} **{entry['player_name']}**: {entry['value']}{value_suffix}\n"
+                # Add defensive programming to handle potentially missing keys
+    player_name = entry.get('player_name', entry.get('name', entry.get('_id', 'Unknown Player')))
+    player_value = entry.get('value', entry.get('count', entry.get('kills', 0)))
+    leaderboard_str += f"{position} **{player_name}**: {player_value}{value_suffix}\n"
 
             embed.add_field(name="Rankings", value=leaderboard_str, inline=False)
 
