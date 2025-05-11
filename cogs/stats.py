@@ -906,24 +906,41 @@ class Stats(commands.Cog):
         try:
             # Defer response to prevent timeout
             await ctx.defer()
-            # Get guild model for themed embed
-            guild_data = None
+            
+            # CRITICAL FIX: Simplify guild model retrieval with robust error handling
             guild_model = None
+            db = self.bot.db
+            
+            # Standard guild lookup with fallback options
             try:
-                # Get guild data with enhanced lookup
-                guild_id = ctx.guild.id
-
-                # Try string conversion of guild ID first
-                guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
-                if guild_data is None:
-                    # Try with integer ID
-                    guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
-
-                if guild_data is not None:
-                    # Use create_from_db_document to ensure proper conversion of premium_tier
-                    guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
+                guild_id = str(ctx.guild.id)
+                logger.info(f"Retrieving guild model for leaderboard command: {guild_id}")
+                
+                # Use the standard get_by_guild_id method with proper string conversion
+                guild_model = await Guild.get_by_guild_id(db, guild_id)
+                
+                # Create guild if it doesn't exist
+                if guild_model is None:
+                    logger.warning(f"Guild {guild_id} not found, creating")
+                    guild_model = await Guild.get_or_create(db, guild_id, ctx.guild.name)
+                
+                if guild_model is not None:
+                    logger.info(f"Retrieved guild model with tier: {guild_model.premium_tier}, type: {type(guild_model.premium_tier).__name__}")
+                else:
+                    embed = await EmbedBuilder.create_error_embed(
+                        "Guild Configuration Error",
+                        "Unable to load or create guild configuration. Please contact an administrator."
+                    )
+                    await ctx.send(embed=embed)
+                    return
             except Exception as e:
-                logger.warning(f"Error getting guild model: {e}")
+                logger.error(f"Error retrieving guild model for leaderboard: {e}", exc_info=True)
+                embed = await EmbedBuilder.create_error_embed(
+                    "Error",
+                    "Failed to load guild configuration. Please contact an administrator."
+                )
+                await ctx.send(embed=embed)
+                return
 
             # Validate limit
             if limit < 1:
@@ -931,95 +948,54 @@ class Stats(commands.Cog):
             elif limit > 25:
                 limit = 25
 
-            # Get guild data with enhanced premium tier verification
-            guild_id = ctx.guild.id
-            logger.info(f"Looking up guild data for guild ID: {guild_id} (type: {type(guild_id)})")
+            # CRITICAL FIX: Enhanced premium verification with clear diagnosis output
+            from utils.premium import has_feature_access
+            
+            # The most direct verification with the centralized method - avoid guild.check_feature_access
+            # for critical commands to ensure consistent validation
+            has_access = await has_feature_access(guild_model, "stats")
+            logger.info(f"Premium tier verification for stats: tier={guild_model.premium_tier}, access={has_access}")
+            
+            if not has_access:
+                # Clean denial with appropriate message
+                embed = await EmbedBuilder.create_error_embed(
+                    "Premium Feature",
+                    "Leaderboards are a premium feature. Please upgrade to the Survivor tier or higher to access this feature.",
+                    guild=guild_model
+                )
+                await ctx.send(embed=embed)
+                return
 
-            # CRITICAL FIX: Use Guild.get_by_guild_id to ensure proper premium tier handling
-            guild = await Guild.get_by_guild_id(self.bot.db, str(guild_id))
-
-            if guild is None:
-                # Try creating a new guild document if it doesn't exist yet
-                logger.warning(f"Guild {guild_id} not found, attempting to create")
-                guild = await Guild.get_or_create(self.bot.db, str(guild_id), ctx.guild.name)
-
-                if guild is None:
-                    embed = await EmbedBuilder.create_error_embed(
-                        "Error",
-                        "This guild is not set up. Please use the setup commands first."
-                    , guild=guild_model)
-                    await ctx.send(embed=embed)
-                    return
-
-            # CRITICAL FIX: Do a direct DB check for the premium tier as verification
-            try:
-                guild_doc = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)}, {"premium_tier": 1})
-                if guild_doc and "premium_tier" in guild_doc:
-                    db_tier = guild_doc.get("premium_tier")
-                    if db_tier is not None:
-                        db_tier_int = int(db_tier)
-                        logger.info(f"Direct DB check - Guild {guild_id} has tier: {db_tier_int}")
-
-                        # Update guild object if DB tier is higher
-                        if db_tier_int > getattr(guild, 'premium_tier', 0):
-                            guild.premium_tier = db_tier_int
-                            logger.info(f"Updated guild object tier to {db_tier_int} based on DB value")
-            except Exception as e:
-                logger.error(f"Error during direct DB tier check: {e}")
-
-            # Check if the guild has access to stats feature with improved logging
-            guild_tier = getattr(guild, 'premium_tier', 0)
-            logger.info(f"Checking stats feature access for guild {guild_id} with tier {guild_tier}")
-
-            # Note: The check_feature_access method has been improved for more accurate tier verification
-            if not guild.check_feature_access("stats"):
-                # Try one more direct validation as an emergency backup
-                try:
-                    from utils.premium import PREMIUM_FEATURES
-                    stats_min_tier = PREMIUM_FEATURES.get("stats", 1)
-                    if guild_tier >= stats_min_tier:
-                        logger.info(f"Direct tier check passed: {guild_tier} >= {stats_min_tier}")
-                    else:
-                        embed = await EmbedBuilder.create_error_embed(
-                            "Premium Feature",
-                            "Leaderboards are a premium feature. Please upgrade to access this feature."
-                        , guild=guild_model)
-                        await ctx.send(embed=embed)
-                        return
-                except Exception as e:
-                    logger.error(f"Error in emergency premium validation: {e}")
-                    embed = await EmbedBuilder.create_error_embed(
-                        "Premium Feature",
-                        "Leaderboards are a premium feature. Please upgrade to access this feature."
-                    , guild=guild_model)
-                    await ctx.send(embed=embed)
-                    return
-
-            # Find the server
+            # Find the server with cleaner lookup
             server = None
             server_name = server_id
-            for s in guild_data.get("servers", []):
-                if s.get("server_id") == server_id:
-                    server = Server(self.bot.db, s)
-                    server_name = s.get("server_name", server_id)
-                    break
-
+            
+            # Try to find server in guild servers list
+            if hasattr(guild_model, 'servers') and guild_model.servers:
+                for s in guild_model.servers:
+                    if s.get("server_id") == server_id:
+                        server = Server(db, s)
+                        server_name = s.get("server_name", server_id)
+                        break
+            
             if server is None:
                 embed = await EmbedBuilder.create_error_embed(
                     "Server Not Found",
-                    f"Server with ID {server_id} not found in this guild."
-                , guild=guild_model)
+                    f"Server with ID {server_id} not found in this guild.",
+                    guild=guild_model
+                )
                 await ctx.send(embed=embed)
                 return
 
             # Get leaderboard data
-            leaderboard_data = await Player.get_leaderboard(self.bot.db, server_id, stat, limit)
+            leaderboard_data = await Player.get_leaderboard(db, server_id, stat, limit)
 
-            if leaderboard_data is None or len(leaderboard_data) == 0:
+            if not leaderboard_data:  # handles both None and empty list
                 embed = await EmbedBuilder.create_error_embed(
                     "No Data",
-                    f"No player data found for '{stat}' on server {server_name}."
-                , guild=guild_model)
+                    f"No player data found for '{stat}' on server {server_name}.",
+                    guild=guild_model
+                )
                 await ctx.send(embed=embed)
                 return
 
@@ -1038,8 +1014,9 @@ class Stats(commands.Cog):
             # Create embed
             embed = await EmbedBuilder.create_base_embed(
                 f"{stat_display} Leaderboard",
-                f"Top {len(leaderboard_data)} players on {server_name}"
-            , guild=guild_model)
+                f"Top {len(leaderboard_data)} players on {server_name}",
+                guild=guild_model
+            )
 
             # Add leaderboard entries
             value_suffix = "m" if stat == "longest_shot" else ""
@@ -1063,8 +1040,9 @@ class Stats(commands.Cog):
             logger.error(f"Error getting leaderboard: {e}", exc_info=True)
             embed = await EmbedBuilder.create_error_embed(
                 "Error",
-                f"An error occurred while getting the leaderboard: {e}"
-            , guild=guild_model)
+                f"An error occurred while getting the leaderboard: {e}",
+                guild=guild_model
+            )
             await ctx.send(embed=embed)
 
     @stats.command(name="weapon_categories", description="View statistics by weapon category")

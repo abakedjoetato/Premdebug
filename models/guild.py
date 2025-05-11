@@ -455,12 +455,22 @@ class Guild(BaseModel):
         Returns:
             bool: True if guild has access to the feature, False otherwise
         """
-        # Import PREMIUM_FEATURES and the main checking function to avoid duplication
-        from utils.premium import PREMIUM_FEATURES, has_feature_access
+        # Import the centralized access checking function
+        from utils.premium import has_feature_access
         
-        # Use the centralized has_feature_access function for consistency
-        # This prevents duplicate code paths that could lead to different results
-        return await has_feature_access(self, feature_name)
+        # Add diagnostic logging for feature check tracing
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Guild.check_feature_access - Guild {self.guild_id}: Checking access to '{feature_name}', tier={self.premium_tier}")
+        
+        # Pass the full guild object to the authoritative access check method
+        # This ensures we use the centralized premium access logic across the entire system
+        has_access = await has_feature_access(self, feature_name)
+        
+        # Log result for auditing and diagnostics
+        logger.info(f"Guild.check_feature_access - Guild {self.guild_id}: Access to '{feature_name}' = {has_access}")
+        
+        return has_access
 
     @classmethod
     async def get_by_guild_id(cls, db, guild_id: str) -> Optional['Guild']:
