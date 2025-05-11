@@ -1050,8 +1050,8 @@ class Stats(commands.Cog):
                 position = f"#{i+1}"
                 # Add defensive programming to handle potentially missing keys
     player_name = entry.get('player_name', entry.get('name', entry.get('_id', 'Unknown Player')))
-    player_value = entry.get('value', entry.get('count', entry.get('kills', 0)))
-    leaderboard_str += f"{position} **{player_name}**: {player_value}{value_suffix}\n"
+                player_value = entry.get('value', entry.get('count', entry.get('kills', 0)))
+                leaderboard_str += f"{position} **{player_name}**: {player_value}{value_suffix}\n"
 
             embed.add_field(name="Rankings", value=leaderboard_str, inline=False)
 

@@ -7,6 +7,7 @@ import logging
 from datetime import datetime
 from typing import Dict, Any, Optional, ClassVar, List, Union, Tuple, cast
 import uuid
+import concurrent.futures
 
 from models.base_model import BaseModel
 
@@ -790,7 +791,7 @@ class Guild(BaseModel):
 
         return None
 
-    def check_feature_access(self, feature_name: str) -> bool:
+def check_feature_access(self, feature_name: str) -> bool:
         """Check if this guild has access to a premium feature
 
         This comprehensive method implements proper tier inheritance, ensuring that
@@ -843,7 +844,7 @@ class Guild(BaseModel):
 
                         if direct_db_tier is not None:
                             logger.info(f"[TIER_DEBUG] Successfully retrieved direct DB tier: {direct_db_tier}")
-                    except (asyncio.TimeoutError, concurrent.futures.TimeoutError):
+                    except (asyncio.TimeoutError):
                         logger.warning("[TIER_DEBUG] Timeout getting direct DB tier")
                     except Exception as e:
                         logger.error(f"[TIER_DEBUG] Error running direct DB check: {e}")
