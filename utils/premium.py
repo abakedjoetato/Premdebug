@@ -1181,5 +1181,4 @@ async def check_tier_access(db, guild_id: Union[str, int, None], required_tier: 
         f"This feature requires the **{required_tier_name}** tier or higher.\n"
         f"Your server is currently on the **{current_tier_name}** tier.\n\n"
         f"Use `/premium info` to learn more about premium features."
-    )` to learn more about premium features."
     )
