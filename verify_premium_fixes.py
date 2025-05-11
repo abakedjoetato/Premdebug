@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-Script to verify premium tier checks are working correctly 
-for both Guild objects and dictionary guild data
+Script to verify premium feature access checking is working properly
 """
 import asyncio
 import logging
@@ -13,7 +12,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-logger = logging.getLogger("premium_verifier")
+logger = logging.getLogger(__name__)
 
 async def test_premium_checks(guild_id: str) -> Tuple[bool, str]:
     """Test premium tier checks for a specific guild"""
@@ -51,7 +50,7 @@ async def test_premium_checks(guild_id: str) -> Tuple[bool, str]:
         logger.info(f"validate_premium_feature with Guild object: {obj_valid}, error: {obj_error}")
 
         # Step 5: Test Guild.check_feature_access with Guild object
-        obj_check = guild_obj.check_feature_access("stats")
+        obj_check = await guild_obj.check_feature_access("stats")
         logger.info(f"Guild.check_feature_access with Guild object: {obj_check}")
 
         # Step 6: Test with dictionary
@@ -67,7 +66,7 @@ async def test_premium_checks(guild_id: str) -> Tuple[bool, str]:
         try:
             # Need to manually call this since dict doesn't have methods
             from models.guild import Guild
-            dict_check = Guild.check_feature_access(dict_guild, "stats")
+            dict_check = await Guild.check_feature_access(dict_guild, "stats")
             logger.info(f"Guild.check_feature_access with dictionary: {dict_check}")
         except Exception as e:
             logger.error(f"Error in Guild.check_feature_access with dictionary: {e}")
@@ -252,7 +251,7 @@ async def test_all_premium_checks(guild_id: str) -> bool:
                 test_results["model_validate_feature"] = model_validate
                 
                 # Feature check with check_feature_access method
-                model_check_feature = guild_model.check_feature_access("stats")
+                model_check_feature = await guild_model.check_feature_access("stats")
                 logger.info(f"Model check_feature_access('stats'): {model_check_feature}")
                 test_results["model_check_feature"] = model_check_feature
                 

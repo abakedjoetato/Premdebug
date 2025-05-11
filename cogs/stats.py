@@ -37,7 +37,7 @@ async def player_name_autocomplete(interaction: discord.Interaction, current: st
             if hasattr(interaction, 'namespace') and hasattr(interaction.namespace, 'server_id'):
                 server_id = str(interaction.namespace.server_id) if interaction.namespace.server_id else None
                 logger.debug(f"Found server_id in namespace: {server_id}")
-            
+
             # Then try the data structure
             if server_id is None and hasattr(interaction, 'data') and 'options' in interaction.data:
                 for option in interaction.data.get("options", []):
@@ -179,7 +179,7 @@ async def weapon_name_autocomplete(interaction: discord.Interaction, current: st
             if hasattr(interaction, 'namespace') and hasattr(interaction.namespace, 'server_id'):
                 server_id = str(interaction.namespace.server_id) if interaction.namespace.server_id else None
                 logger.debug(f"weapon_name_autocomplete: Found server_id in namespace: {server_id}")
-            
+
             # Then try the data structure
             if server_id is None and hasattr(interaction, 'data') and 'options' in interaction.data:
                 for option in interaction.data.get("options", []):
@@ -293,13 +293,13 @@ class Stats(commands.Cog):
         """Stats command group"""
         # Log premium access for debugging
         logger.info(f"Stats command accessed by user {ctx.author.id} in guild {ctx.guild.id}")
-        
+
         # Get guild model to verify premium tier
         guild_model = await Guild.get_by_id(self.bot.db, ctx.guild.id)
         if guild_model:
             logger.info(f"Guild {ctx.guild.id} has premium tier: {guild_model.premium_tier}")
             logger.info(f"Feature 'stats' access: {guild_model.check_feature_access('stats')}")
-        
+
         if ctx.invoked_subcommand is None:
             await ctx.send("Please specify a subcommand.")
 
@@ -760,6 +760,7 @@ class Stats(commands.Cog):
                 if hasattr(item, "custom_id") and item.custom_id.startswith("pagination_"):
                     item.callback = pagination_callback
 
+        ```python
         except Exception as e:
             logger.error(f"Error getting player stats: {e}", exc_info=True)
             embed = await EmbedBuilder.create_error_embed(
@@ -784,13 +785,13 @@ class Stats(commands.Cog):
             try:
                 # Get guild data with enhanced lookup
                 guild_id = ctx.guild.id
-                
+
                 # Try string conversion of guild ID first
                 guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
                 if guild_data is None:
                     # Try with integer ID
                     guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
-                
+
                 if guild_data is not None:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
@@ -800,13 +801,13 @@ class Stats(commands.Cog):
             # Get guild data
             # Get guild data with enhanced lookup
             guild_id = ctx.guild.id
-            
+
             # Try string conversion of guild ID first
             guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
             if guild_data is None:
                 # Try with integer ID
                 guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
-            
+
             if guild_data is None:
                 embed = await EmbedBuilder.create_error_embed(
                     "Error",
@@ -817,7 +818,7 @@ class Stats(commands.Cog):
 
             # Check if the is not None guild has access to stats feature
             guild = Guild(self.bot.db, guild_data)
-            if guild is None or not guild.check_feature_access("stats"):
+            if guild is None or not await guild.check_feature_access("stats"):
                     embed = await EmbedBuilder.create_error_embed(
                         "Premium Feature",
                         "Server statistics is a premium feature. Please upgrade to access this feature."
@@ -912,13 +913,13 @@ class Stats(commands.Cog):
             try:
                 # Get guild data with enhanced lookup
                 guild_id = ctx.guild.id
-                
+
                 # Try string conversion of guild ID first
                 guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
                 if guild_data is None:
                     # Try with integer ID
                     guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
-                
+
                 if guild_data is not None:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
@@ -934,15 +935,15 @@ class Stats(commands.Cog):
             # Get guild data with enhanced premium tier verification
             guild_id = ctx.guild.id
             logger.info(f"Looking up guild data for guild ID: {guild_id} (type: {type(guild_id)})")
-            
+
             # CRITICAL FIX: Use Guild.get_by_guild_id to ensure proper premium tier handling
             guild = await Guild.get_by_guild_id(self.bot.db, str(guild_id))
-            
+
             if guild is None:
                 # Try creating a new guild document if it doesn't exist yet
                 logger.warning(f"Guild {guild_id} not found, attempting to create")
                 guild = await Guild.get_or_create(self.bot.db, str(guild_id), ctx.guild.name)
-                
+
                 if guild is None:
                     embed = await EmbedBuilder.create_error_embed(
                         "Error",
@@ -950,7 +951,7 @@ class Stats(commands.Cog):
                     , guild=guild_model)
                     await ctx.send(embed=embed)
                     return
-            
+
             # CRITICAL FIX: Do a direct DB check for the premium tier as verification
             try:
                 guild_doc = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)}, {"premium_tier": 1})
@@ -959,18 +960,18 @@ class Stats(commands.Cog):
                     if db_tier is not None:
                         db_tier_int = int(db_tier)
                         logger.info(f"Direct DB check - Guild {guild_id} has tier: {db_tier_int}")
-                        
+
                         # Update guild object if DB tier is higher
                         if db_tier_int > getattr(guild, 'premium_tier', 0):
                             guild.premium_tier = db_tier_int
                             logger.info(f"Updated guild object tier to {db_tier_int} based on DB value")
             except Exception as e:
                 logger.error(f"Error during direct DB tier check: {e}")
-            
+
             # Check if the guild has access to stats feature with improved logging
             guild_tier = getattr(guild, 'premium_tier', 0)
             logger.info(f"Checking stats feature access for guild {guild_id} with tier {guild_tier}")
-            
+
             # Note: The check_feature_access method has been improved for more accurate tier verification
             if not guild.check_feature_access("stats"):
                 # Try one more direct validation as an emergency backup
@@ -1086,13 +1087,13 @@ class Stats(commands.Cog):
                 # Get guild data with enhanced lookup
                 guild_id = ctx.guild.id
                 logger.info(f"Looking up guild data for guild ID: {guild_id} (type: {type(guild_id)})")
-                
+
                 # Try string conversion of guild ID first
                 guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
                 if guild_data is None:
                     # Try with integer ID
                     guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
-                
+
                 if guild_data is not None:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
@@ -1101,7 +1102,7 @@ class Stats(commands.Cog):
                 logger.warning(f"Error getting guild model: {e}")
                 guild_model = None
                 guild = None
-            
+
             if guild_data is None:
                 embed = await EmbedBuilder.create_error_embed(
                     "Error",
@@ -1119,7 +1120,7 @@ class Stats(commands.Cog):
                 )
                 await ctx.send(embed=embed)
                 return
-                
+
             # Check if premium tier is set correctly first
             premium_tier = getattr(guild, 'premium_tier', None)
             logger.info(f"PREMIUM TIER: {premium_tier}")
@@ -1127,7 +1128,7 @@ class Stats(commands.Cog):
                 logger.info(f"Maximum tier detected: {premium_tier} - Bypassing feature check")
                 # Tier 4 bypasses all feature checks
                 pass
-            elif not guild.check_feature_access("stats"):
+            elif not await guild.check_feature_access("stats"):
                 embed = await EmbedBuilder.create_error_embed(
                     "Premium Feature",
                     "Weapon category statistics is a premium feature. Please upgrade to access this feature."
@@ -1266,13 +1267,13 @@ class Stats(commands.Cog):
                 # Get guild data with enhanced lookup
                 guild_id = ctx.guild.id
                 logger.info(f"Looking up guild data for guild ID: {guild_id} (type: {type(guild_id)})")
-                
+
                 # Try string conversion of guild ID first
                 guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
                 if guild_data is None:
                     # Try with integer ID
                     guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
-                
+
                 if guild_data is not None:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
@@ -1282,13 +1283,13 @@ class Stats(commands.Cog):
             # Get guild data
             # Get guild data with enhanced lookup
             guild_id = ctx.guild.id
-            
+
             # Try string conversion of guild ID first
             guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
             if guild_data is None:
                 # Try with integer ID
                 guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
-            
+
             if guild_data is None:
                 embed = await EmbedBuilder.create_error_embed(
                     "Error",
@@ -1299,7 +1300,7 @@ class Stats(commands.Cog):
 
             # Check if the is not None guild has access to stats feature
             guild = Guild(self.bot.db, guild_data)
-            if guild is None or not guild.check_feature_access("stats"):
+            if guild is None or not await guild.check_feature_access("stats"):
                 embed = await EmbedBuilder.create_error_embed(
                     "Premium Feature",
                     "Weapon statistics is a premium feature. Please upgrade to access this feature."

@@ -89,16 +89,16 @@ class Server(BaseModel):
         """
         document = await db.game_servers.find_one({"server_id": server_id})
         return cls.from_document(document) if document is not None else None
-        
+
     async def save(self, db) -> bool:
         """Save server to database
-        
+
         This ensures that all fields are properly saved, including the sftp_enabled flag
         which is needed for proper SFTP operations.
-        
+
         Args:
             db: Database connection
-            
+
         Returns:
             bool: True if successful, False otherwise
         """
@@ -112,20 +112,20 @@ class Server(BaseModel):
                 # Set sftp_enabled explicitly if it has required fields
                 self.sftp_enabled = True
                 logger.info(f"Setting sftp_enabled=True for server {self.server_id} with valid SFTP credentials")
-            
+
             # Update the updated_at timestamp
             self.updated_at = datetime.utcnow()
-            
+
             # Get document representation
             doc = self.to_document()
-            
+
             # Ensure MongoDB _id field is excluded from the document if it's None
             if '_id' in doc and doc['_id'] is None:
                 del doc['_id']
-            
+
             # Check if document already exists
             existing = await db.game_servers.find_one({"server_id": self.server_id})
-            
+
             if existing:
                 # Update existing document
                 result = await db.game_servers.update_one(
@@ -138,7 +138,7 @@ class Server(BaseModel):
                 result = await db.game_servers.insert_one(doc)
                 self._id = result.inserted_id
                 success = True
-                
+
             # If successful, also update the server in the 'servers' collection for the CSV processor
             # This ensures both collections have the correct SFTP data
             if success:
@@ -149,7 +149,7 @@ class Server(BaseModel):
                     upsert=True
                 )
                 logger.info(f"Updated server in servers collection: {servers_result.modified_count} modified, {servers_result.upserted_id != None} upserted")
-            
+
             return success
         except Exception as e:
             logger.error(f"Error saving server {self.server_id}: {e}")
@@ -170,23 +170,23 @@ class Server(BaseModel):
         """
         # Import standardize_server_id here to avoid circular imports
         from utils.server_utils import standardize_server_id
-        
+
         # Standardize the server_id to ensure consistent formatting
         standardized_server_id = standardize_server_id(server_id)
-        
+
         if standardized_server_id is None:
             logger.warning(f"Invalid server_id format: {server_id}")
             return None
-            
+
         # Build the query with standardized server ID
         query = {"server_id": standardized_server_id}
         if guild_id is not None:
             # Ensure consistent string comparison for guild ID too
             query["guild_id"] = str(guild_id)
-        
+
         # First try exact match
         document = await db.game_servers.find_one(query)
-        
+
         # If no results, try case-insensitive search
         if document is None:
             logger.debug(f"No exact match for server_id: {standardized_server_id}, trying case-insensitive search")
@@ -199,18 +199,18 @@ class Server(BaseModel):
                 "server_id": {"$regex": f"^{standardized_server_id}$", "$options": "i"}
             }
             document = await db.game_servers.find_one(new_query)
-            
+
         # If still not found, check servers collection (where CSV data is stored)    
         if document is None:
             logger.debug(f"Server not found in game_servers, checking servers collection")
-            
+
             # Try exact match in servers collection
             server_query = {"server_id": standardized_server_id}
             if guild_id is not None:
                 server_query["guild_id"] = str(guild_id)
-                
+
             document = await db.servers.find_one(server_query)
-            
+
             # Try with regex if needed
             if document is None:
                 regex_server_query = {
@@ -218,13 +218,13 @@ class Server(BaseModel):
                     "server_id": {"$regex": f"^{standardized_server_id}$", "$options": "i"}
                 }
                 document = await db.servers.find_one(regex_server_query)
-            
+
             # If document is found, map it to format expected by from_document
             if document is not None:
                 logger.info(f"Found server {standardized_server_id} in servers collection")
                 # Extract original server ID for path construction if available
                 original_server_id = document.get("original_server_id")
-                
+
                 # Convert to expected format
                 document = {
                     "server_id": document.get("server_id"),
@@ -238,24 +238,24 @@ class Server(BaseModel):
                     "original_server_id": original_server_id,
                     "_id": document.get("_id")
                 }
-            
+
         # If still no results and guild_id is provided, look in the guild's servers list as fallback
         if not document and guild_id is not None:
             logger.debug(f"Server not found in game_servers or servers, checking guild's server list")
             guild_doc = await db.guilds.find_one({"guild_id": str(guild_id)})
-            
+
             if guild_doc is not None and "servers" in guild_doc:
                 for server in guild_doc.get("servers", []):
                     # Standardize server ID from guild.servers for comparison
                     server_id_in_guild = standardize_server_id(server.get("server_id"))
-                    
+
                     # Check if server IDs match after standardization
                     if server_id_in_guild == standardized_server_id:
                         # Found server in guild.servers, create a server document
                         logger.info(f"Found server {standardized_server_id} in guild.servers but not in game_servers")
                         # Extract the original numeric server ID for path construction
                         original_server_id = server.get("original_server_id")
-                        
+
                         # If original_server_id is not found, try to extract it from server_id
                         if original_server_id is None:
                             # Check if server_id contains numeric segment that could be original ID
@@ -265,7 +265,7 @@ class Server(BaseModel):
                                 if numeric_parts:
                                     original_server_id = numeric_parts
                                     logger.info(f"Extracted fallback original_server_id {original_server_id} from server_id {server.get('server_id')}")
-                        
+
                         server_doc = {
                             "server_id": standardized_server_id,
                             "guild_id": str(guild_id),
@@ -281,7 +281,7 @@ class Server(BaseModel):
                         }
                         document = server_doc
                         break
-        
+
         return cls.from_document(document) if document is not None else None
 
     @classmethod
@@ -298,20 +298,20 @@ class Server(BaseModel):
         """
         # Ensure consistent string comparisons
         guild_id_str = str(guild_id)
-        
+
         # First try game_servers collection
         document = await db.game_servers.find_one({"name": name, "guild_id": guild_id_str})
-        
+
         # If not found in game_servers, try servers collection
         if document is None:
             logger.debug(f"Server '{name}' not found in game_servers for guild {guild_id_str}, checking servers collection")
             document = await db.servers.find_one({"name": name, "guild_id": guild_id_str})
-            
+
             # Format document if found
             if document is not None:
                 logger.info(f"Found server '{name}' in servers collection for guild {guild_id_str}")
                 original_server_id = document.get("original_server_id")
-                
+
                 # Convert to expected format
                 document = {
                     "server_id": document.get("server_id"),
@@ -325,28 +325,28 @@ class Server(BaseModel):
                     "original_server_id": original_server_id,
                     "_id": document.get("_id")
                 }
-        
+
         # If still not found, check guild.servers as fallback
         if document is None:
             logger.debug(f"Server '{name}' not found in collections, checking guild.servers for guild {guild_id_str}")
             guild_doc = await db.guilds.find_one({"guild_id": guild_id_str})
-            
+
             if guild_doc is not None and "servers" in guild_doc:
                 for server_data in guild_doc.get("servers", []):
                     # Check both server_name and name fields for matching
                     server_name = server_data.get("server_name") or server_data.get("name")
                     if server_name and server_name.lower() == name.lower():
                         logger.info(f"Found server '{name}' in guild.servers")
-                        
+
                         # Extract the original numeric server ID for path construction
                         original_server_id = server_data.get("original_server_id")
-                        
+
                         # If original_server_id is not found, try to extract it
                         if original_server_id is None and server_data.get("server_id"):
                             numeric_parts = ''.join(filter(str.isdigit, server_data.get("server_id", "")))
                             if numeric_parts:
                                 original_server_id = numeric_parts
-                        
+
                         # Create a document
                         document = {
                             "server_id": server_data.get("server_id"),
@@ -362,7 +362,7 @@ class Server(BaseModel):
                             "updated_at": datetime.utcnow()
                         }
                         break  # Stop after finding the first match
-        
+
         return cls.from_document(document) if document is not None else None
 
     @classmethod
@@ -381,7 +381,7 @@ class Server(BaseModel):
 
         servers = []
         seen_ids = set()  # Track server IDs to avoid duplicates
-        
+
         # First check game_servers collection
         try:
             game_servers_cursor = db.game_servers.find({"guild_id": guild_id_str})
@@ -402,7 +402,7 @@ class Server(BaseModel):
                 server_id = document.get("server_id")
                 if server_id in seen_ids:
                     continue
-                
+
                 # Format document for from_document
                 formatted_doc = {
                     "server_id": server_id,
@@ -416,36 +416,36 @@ class Server(BaseModel):
                     "original_server_id": document.get("original_server_id"),
                     "_id": document.get("_id")
                 }
-                
+
                 server = cls.from_document(formatted_doc)
                 if server is not None:
                     servers.append(server)
                     seen_ids.add(server_id)
         except Exception as e:
             logger.error(f"Error fetching servers from servers collection: {e}")
-            
+
         # Finally check guild.servers as fallback
         if len(servers) == 0:
             try:
                 logger.debug(f"Checking guild.servers for guild {guild_id_str}")
                 guild_doc = await db.guilds.find_one({"guild_id": guild_id_str})
-                
+
                 if guild_doc is not None and "servers" in guild_doc:
                     for server_data in guild_doc.get("servers", []):
                         server_id = server_data.get("server_id")
                         if server_id in seen_ids:
                             continue
-                            
+
                         # Extract the original numeric server ID for path construction
                         original_server_id = server_data.get("original_server_id")
-                        
+
                         # If original_server_id is not found, try to extract it
                         if original_server_id is None and server_data.get("server_id"):
                             # Check if server_id contains numeric segment
                             numeric_parts = ''.join(filter(str.isdigit, server_data.get("server_id", "")))
                             if numeric_parts:
                                 original_server_id = numeric_parts
-                                
+
                         formatted_doc = {
                             "server_id": server_id,
                             "guild_id": guild_id_str,
@@ -459,7 +459,7 @@ class Server(BaseModel):
                             "created_at": datetime.utcnow(),
                             "updated_at": datetime.utcnow()
                         }
-                        
+
                         server = cls.from_document(formatted_doc)
                         if server is not None:
                             servers.append(server)
@@ -482,21 +482,21 @@ class Server(BaseModel):
         """
         # Ensure consistent string comparison
         guild_id_str = str(guild_id)
-        
+
         # First try game_servers collection
         document = await db.game_servers.find_one({"guild_id": guild_id_str})
-        
+
         # If not found, try servers collection where CSV data is stored
         if document is None:
             logger.debug(f"No server found in game_servers for guild {guild_id_str}, checking servers collection")
             document = await db.servers.find_one({"guild_id": guild_id_str})
-            
+
             # If found in servers collection, format document properly for from_document
             if document is not None:
                 logger.info(f"Found server in servers collection for guild {guild_id_str}")
                 # Extract original server ID for path construction if available
                 original_server_id = document.get("original_server_id")
-                
+
                 # Convert to expected format
                 document = {
                     "server_id": document.get("server_id"),
@@ -510,26 +510,26 @@ class Server(BaseModel):
                     "original_server_id": original_server_id,
                     "_id": document.get("_id")
                 }
-        
+
         # If still not found, look in guild.servers (embedded in guild document)
         if document is None:
             logger.debug(f"No server found in game_servers or servers collection for guild {guild_id_str}, checking guild.servers")
             guild_doc = await db.guilds.find_one({"guild_id": guild_id_str})
-            
+
             if guild_doc is not None and "servers" in guild_doc and len(guild_doc.get("servers", [])) > 0:
                 logger.info(f"Using first server from guild.servers for guild {guild_id_str}")
                 server_data = guild_doc["servers"][0]
-                
+
                 # Extract the original numeric server ID for path construction
                 original_server_id = server_data.get("original_server_id")
-                
+
                 # If original_server_id is not found, try to extract it from server_id
                 if original_server_id is None and server_data.get("server_id"):
                     # Check if server_id contains numeric segment that could be original ID
                     numeric_parts = ''.join(filter(str.isdigit, server_data.get("server_id", "")))
                     if numeric_parts:
                         original_server_id = numeric_parts
-                
+
                 document = {
                     "server_id": server_data.get("server_id"),
                     "guild_id": guild_id_str,
@@ -543,7 +543,7 @@ class Server(BaseModel):
                     "created_at": datetime.utcnow(),
                     "updated_at": datetime.utcnow()
                 }
-        
+
         return cls.from_document(document) if document is not None else None
 
     async def update_status(self, db, status: str, error_message: Optional[str] = None) -> bool:
@@ -722,13 +722,13 @@ class Server(BaseModel):
             Server object or None if creation failed
         """
         import uuid
-        
+
         # Create server ID
         server_id = str(uuid.uuid4())
-        
+
         # IMPORTANT: Extract numeric ID from server name if not provided
         from utils.server_identity import identify_server
-        
+
         if original_server_id is None:
             logger.info(f"No original_server_id provided, attempting to extract from name: '{name}'")
             # Try to extract numeric ID from server name or construct a useful one
@@ -738,7 +738,7 @@ class Server(BaseModel):
                     original_server_id = word
                     logger.info(f"Found numeric ID in server name: {original_server_id}")
                     break
-                    
+
             # If we still don't have an original_server_id, ask server_identity module
             if original_server_id is None:
                 numeric_id, is_known = identify_server(
@@ -747,12 +747,12 @@ class Server(BaseModel):
                     server_name=name,
                     guild_id=guild_id
                 )
-                
+
                 if numeric_id:
                     original_server_id = numeric_id
                     logger.info(f"Using identified numeric ID '{numeric_id}' for path construction")
-        
-        # If we still don't have a numeric ID, create one from last 4 digits of UUID
+
+        # If westill don't have a numeric ID, create one from last 4 digits of UUID
         if original_server_id is None:
             # Extract the last 4-5 digits of the UUID as a fallback numeric ID
             uuid_digits = ''.join(filter(str.isdigit, server_id))
@@ -795,7 +795,7 @@ class Server(BaseModel):
             updated_at=now,
             original_server_id=original_server_id  # Store the original numeric server ID
         )
-        
+
         # Log server creation with both IDs for diagnostic purposes
         logger.info(f"Creating server with UUID: {server_id} and original ID: {original_server_id}")
 
@@ -814,7 +814,7 @@ class Server(BaseModel):
         standalone_count = 0
         guild_count = 0
         success = False
-        
+
         try:
             # Use standardize_server_id for consistent handling
             from utils.server_utils import standardize_server_id
@@ -829,19 +829,19 @@ class Server(BaseModel):
             logger.info(f"  - server_id: {self.server_id}, type: {type(self.server_id)}")
             logger.info(f"  - guild_id: {self.guild_id}, type: {type(self.guild_id)}")
             logger.info(f"  - name: {self.name}")
-            
+
             # First try to find server in all collections using multiple approaches
             # This helps identify what ID format the server might be stored with
             game_exact = await db.game_servers.find_one({"server_id": str_server_id})
             game_std = await db.game_servers.find_one({"server_id": std_server_id})
-            
+
             standalone_exact = await db.servers.find_one({"server_id": str_server_id})
             standalone_std = await db.servers.find_one({"server_id": std_server_id})
-            
+
             # Check guild using multiple approaches
             guild_exact = await db.guilds.find_one({"servers.server_id": str_server_id})
             guild_std = await db.guilds.find_one({"servers.server_id": std_server_id})
-            
+
             # Try numeric match if ID is numeric
             game_numeric = None
             standalone_numeric = None
@@ -851,13 +851,13 @@ class Server(BaseModel):
                 game_numeric = await db.game_servers.find_one({"server_id": numeric_id})
                 standalone_numeric = await db.servers.find_one({"server_id": numeric_id})
                 guild_numeric = await db.guilds.find_one({"servers.server_id": numeric_id})
-            
+
             # Log all search results for debugging
             logger.info(f"Server search results:")
             logger.info(f"  - game_servers: exact={game_exact is not None}, std={game_std is not None}, numeric={game_numeric is not None}")
             logger.info(f"  - servers: exact={standalone_exact is not None}, std={standalone_std is not None}, numeric={standalone_numeric is not None}")
             logger.info(f"  - guilds: exact={guild_exact is not None}, std={guild_std is not None}, numeric={guild_numeric is not None}")
-            
+
             # Verify server exists in any collection using any ID format
             if not any([game_exact, game_std, game_numeric, 
                       standalone_exact, standalone_std, standalone_numeric,
@@ -871,18 +871,18 @@ class Server(BaseModel):
                 # This ensures we catch the server regardless of ID format
                 game_exact_result = await db.game_servers.delete_many({"server_id": str_server_id})
                 game_std_result = await db.game_servers.delete_many({"server_id": std_server_id})
-                
+
                 # Numeric match if ID is numeric
                 game_numeric_result = None
                 if std_server_id.isdigit():
                     numeric_id = int(std_server_id)
                     game_numeric_result = await db.game_servers.delete_many({"server_id": numeric_id})
-                
+
                 # Case-insensitive regex match as last resort
                 game_regex_result = await db.game_servers.delete_many({
                     "server_id": {"$regex": f"^{std_server_id}$", "$options": "i"}
                 })
-                
+
                 # Calculate total deleted
                 game_count = (
                     game_exact_result.deleted_count + 
@@ -899,18 +899,18 @@ class Server(BaseModel):
                 # 2. Remove from standalone servers using same approach
                 standalone_exact_result = await db.servers.delete_many({"server_id": str_server_id})
                 standalone_std_result = await db.servers.delete_many({"server_id": std_server_id})
-                
+
                 # Numeric match if ID is numeric
                 standalone_numeric_result = None
                 if std_server_id.isdigit():
                     numeric_id = int(std_server_id)
                     standalone_numeric_result = await db.servers.delete_many({"server_id": numeric_id})
-                
+
                 # Case-insensitive regex match as last resort
                 standalone_regex_result = await db.servers.delete_many({
                     "server_id": {"$regex": f"^{std_server_id}$", "$options": "i"}
                 })
-                
+
                 # Calculate total deleted
                 standalone_count = (
                     standalone_exact_result.deleted_count + 
@@ -996,7 +996,7 @@ class Server(BaseModel):
             except Exception as e:
                 logger.error(f"Error during server deletion: {e}")
                 success = False
-                
+
                 # Fall back to trying direct cleanup of player records and integrations
                 fallback_success = False
                 try:
@@ -1021,20 +1021,20 @@ class Server(BaseModel):
 
                     # Clean up any integration status records
                     await db.integration_status.delete_many({"server_id": str_server_id})
-                    
+
                     fallback_success = True
                     logger.info(f"Fallback cleanup for server {str_server_id} succeeded")
                 except Exception as fallback_error:
                     logger.error(f"Error during fallback cleanup for server {str_server_id}: {fallback_error}")
                     # Continue with deletion even if fallback cleanup fails
-                
+
                 # If the fallback succeeded but the main deletion failed, still consider it successful
                 if fallback_success:
                     success = True
 
             # Update counts in main try block instead - moved to after the db operations
             # We'll keep our safely initialized defaults from the start of the method
-            
+
             logger.info(
                 f"Server {str_server_id} deletion completed:\n"
                 f"- Game servers removed: {game_count}\n"
@@ -1047,3 +1047,98 @@ class Server(BaseModel):
         except Exception as e:
             logger.error(f"Error in coordinated deletion of server {self.server_id}: {e}")
             return False
+
+    async def get_active_player_count(self) -> int:
+        """Get count of active players on server
+
+        Returns:
+            int: Number of active players
+        """
+        cursor = self.db.players.find({
+            "server_id": self.server_id,
+            "active": True
+        })
+        return await cursor.count_documents()
+
+    async def get_server_stats(self) -> Dict[str, Any]:
+        """Get comprehensive statistics for this server
+
+        Returns:
+            Dict[str, Any]: Dictionary containing server statistics
+        """
+        try:
+            # Basic server info
+            stats = {
+                "server_id": self.server_id,
+                "server_name": self.name,
+                "active_players": await self.get_active_player_count()
+            }
+
+            # Get top killers
+            killer_pipeline = [
+                {"$match": {"server_id": self.server_id, "is_suicide": False}},
+                {"$group": {
+                    "_id": "$killer_id",
+                    "player_name": {"$first": "$killer_name"},
+                    "kills": {"$sum": 1}
+                }},
+                {"$sort": {"kills": -1}},
+                {"$limit": 10}
+            ]
+
+            killer_cursor = self.db.kills.aggregate(killer_pipeline)
+            top_killers = await killer_cursor.to_list(length=10)
+            stats["top_killers"] = top_killers
+
+            # Get top weapons
+            weapon_pipeline = [
+                {"$match": {"server_id": self.server_id, "is_suicide": False}},
+                {"$group": {
+                    "_id": "$weapon",
+                    "weapon": {"$first": "$weapon"},
+                    "kills": {"$sum": 1}
+                }},
+                {"$sort": {"kills": -1}},
+                {"$limit": 10}
+            ]
+
+            weapon_cursor = self.db.kills.aggregate(weapon_pipeline)
+            top_weapons = await weapon_cursor.to_list(length=10)
+            stats["top_weapons"] = top_weapons
+
+            # Get recent events
+            events_cursor = self.db.kills.find(
+                {"server_id": self.server_id}
+            ).sort("timestamp", -1).limit(10)
+
+            recent_events = await events_cursor.to_list(length=10)
+            formatted_events = []
+
+            for event in recent_events:
+                formatted_events.append({
+                    "event_type": "kill" if not event.get("is_suicide", False) else "suicide",
+                    "killer_name": event.get("killer_name", "Unknown"),
+                    "victim_name": event.get("victim_name", "Unknown"),
+                    "weapon": event.get("weapon", "Unknown"),
+                    "timestamp": event.get("timestamp", datetime.utcnow())
+                })
+
+            stats["recent_events"] = formatted_events
+
+            # Get total kills, deaths, and suicides
+            total_kills = await self.db.kills.count_documents({"server_id": self.server_id, "is_suicide": False})
+            total_suicides = await self.db.kills.count_documents({"server_id": self.server_id, "is_suicide": True})
+
+            stats["total_kills"] = total_kills
+            stats["total_suicides"] = total_suicides
+            stats["total_deaths"] = total_kills + total_suicides  # Deaths = kills + suicides
+
+            return stats
+
+        except Exception as e:
+            logger.error(f"Error getting server stats: {e}")
+            return {
+                "server_id": self.server_id,
+                "server_name": self.name,
+                "error": str(e)
+            }
