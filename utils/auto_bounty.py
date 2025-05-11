@@ -209,7 +209,7 @@ class AutoBountySystem:
             
             # Create the embed
             from utils.embed_builder import EmbedBuilder
-            embed = EmbedBuilder.create_base_embed(
+            embed = await EmbedBuilder.create_base_embed(
                 f"🤖 New AI Bounty: {target_name}",
                 f"The AI Bounty System has placed a bounty on **{target_name}**!",
                 guild=guild_model

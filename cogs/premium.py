@@ -36,7 +36,15 @@ class Premium(commands.Cog):
             guild_data = None
             guild_model = None
             try:
-                guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
+                # Get guild data with enhanced lookup
+                guild_id = ctx.guild.id
+                
+                # Try string conversion of guild ID first
+                guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
+                if guild_data is None:
+                    # Try with integer ID
+                    guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
+                
                 if guild_data is not None:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
@@ -45,7 +53,7 @@ class Premium(commands.Cog):
                 logger.warning(f"Error getting guild model: {e}")
 
             # Create base embed
-            embed = EmbedBuilder.create_base_embed(
+            embed = await EmbedBuilder.create_base_embed(
                 "Premium Tiers",
                 "View available premium tiers and their features",
                 guild=guild_model

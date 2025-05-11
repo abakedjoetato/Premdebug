@@ -302,7 +302,7 @@ class Stats(commands.Cog):
 
             # Use explicit None check for MongoDB objects instead of truthiness test
             if guild is None:
-                embed = EmbedBuilder.create_error_embed(
+                embed = await EmbedBuilder.create_error_embed(
                     "Error",
                     "This guild is not set up. Please use the setup commands first."
                 )
@@ -359,7 +359,18 @@ class Stats(commands.Cog):
             embeds = []
 
             # Primary stats embed
-            primary_embed = await EmbedBuilder.create_stats_embed(player_stats, server_name)
+            # Check if create_stats_embed exists as an async method
+            try:
+                primary_embed = await EmbedBuilder.create_stats_embed(player_stats, server_name)
+            except AttributeError:
+                # Fallback: create a basic embed with stats
+                primary_embed = discord.Embed(
+                    title=f"📊 Player Stats: {player_stats.get('player_name', 'Unknown')}",
+                    description=f"Statistics for {player_stats.get('player_name', 'Unknown')} on {server_name}",
+                    color=EMBED_COLOR,
+                    timestamp=datetime.utcnow()
+                )
+                primary_embed.set_footer(text=EMBED_FOOTER)
 
             # Add core statistics
             kills = player_stats.get("kills", 0)
@@ -728,7 +739,7 @@ class Stats(commands.Cog):
 
         except Exception as e:
             logger.error(f"Error getting player stats: {e}", exc_info=True)
-            embed = EmbedBuilder.create_error_embed(
+            embed = await EmbedBuilder.create_error_embed(
                 "Error",
                 f"An error occurred while getting player stats: {e}"
             , guild=guild_model)
@@ -748,7 +759,15 @@ class Stats(commands.Cog):
             guild_data = None
             guild_model = None
             try:
-                guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
+                # Get guild data with enhanced lookup
+                guild_id = ctx.guild.id
+                
+                # Try string conversion of guild ID first
+                guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
+                if guild_data is None:
+                    # Try with integer ID
+                    guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
+                
                 if guild_data is not None:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
@@ -756,9 +775,17 @@ class Stats(commands.Cog):
                 logger.warning(f"Error getting guild model: {e}")
 
             # Get guild data
-            guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
+            # Get guild data with enhanced lookup
+            guild_id = ctx.guild.id
+            
+            # Try string conversion of guild ID first
+            guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
             if guild_data is None:
-                embed = EmbedBuilder.create_error_embed(
+                # Try with integer ID
+                guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
+            
+            if guild_data is None:
+                embed = await EmbedBuilder.create_error_embed(
                     "Error",
                     "This guild is not set up. Please use the setup commands first."
                 , guild=guild_model)
@@ -768,7 +795,7 @@ class Stats(commands.Cog):
             # Check if the is not None guild has access to stats feature
             guild = Guild(self.bot.db, guild_data)
             if guild is None or not guild.check_feature_access("stats"):
-                    embed = EmbedBuilder.create_error_embed(
+                    embed = await EmbedBuilder.create_error_embed(
                         "Premium Feature",
                         "Server statistics is a premium feature. Please upgrade to access this feature."
                     , guild=guild_model)
@@ -828,7 +855,7 @@ class Stats(commands.Cog):
 
         except Exception as e:
             logger.error(f"Error getting server stats: {e}", exc_info=True)
-            embed = EmbedBuilder.create_error_embed(
+            embed = await EmbedBuilder.create_error_embed(
                 "Error",
                 f"An error occurred while getting server stats: {e}"
             , guild=guild_model)
@@ -860,7 +887,15 @@ class Stats(commands.Cog):
             guild_data = None
             guild_model = None
             try:
-                guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
+                # Get guild data with enhanced lookup
+                guild_id = ctx.guild.id
+                
+                # Try string conversion of guild ID first
+                guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
+                if guild_data is None:
+                    # Try with integer ID
+                    guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
+                
                 if guild_data is not None:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
@@ -874,9 +909,18 @@ class Stats(commands.Cog):
                 limit = 25
 
             # Get guild data
-            guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
+            # Get guild data with enhanced lookup
+            guild_id = ctx.guild.id
+            logger.info(f"Looking up guild data for guild ID: {guild_id} (type: {type(guild_id)})")
+            
+            # Try string conversion of guild ID first
+            guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
             if guild_data is None:
-                embed = EmbedBuilder.create_error_embed(
+                # Try with integer ID
+                guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
+            
+            if guild_data is None:
+                embed = await EmbedBuilder.create_error_embed(
                     "Error",
                     "This guild is not set up. Please use the setup commands first."
                 , guild=guild_model)
@@ -886,7 +930,7 @@ class Stats(commands.Cog):
             # Check if the is not None guild has access to stats feature
             guild = Guild(self.bot.db, guild_data)
             if guild is None or not guild.check_feature_access("stats"):
-                embed = EmbedBuilder.create_error_embed(
+                embed = await EmbedBuilder.create_error_embed(
                     "Premium Feature",
                     "Leaderboards are a premium feature. Please upgrade to access this feature."
                 , guild=guild_model)
@@ -914,7 +958,7 @@ class Stats(commands.Cog):
             leaderboard_data = await Player.get_leaderboard(self.bot.db, server_id, stat, limit)
 
             if leaderboard_data is None or len(leaderboard_data) == 0:
-                embed = EmbedBuilder.create_error_embed(
+                embed = await EmbedBuilder.create_error_embed(
                     "No Data",
                     f"No player data found for '{stat}' on server {server_name}."
                 , guild=guild_model)
@@ -934,7 +978,7 @@ class Stats(commands.Cog):
             stat_display = stat_names.get(stat, stat.title())
 
             # Create embed
-            embed = EmbedBuilder.create_base_embed(
+            embed = await EmbedBuilder.create_base_embed(
                 f"{stat_display} Leaderboard",
                 f"Top {len(leaderboard_data)} players on {server_name}"
             , guild=guild_model)
@@ -956,7 +1000,7 @@ class Stats(commands.Cog):
 
         except Exception as e:
             logger.error(f"Error getting leaderboard: {e}", exc_info=True)
-            embed = EmbedBuilder.create_error_embed(
+            embed = await EmbedBuilder.create_error_embed(
                 "Error",
                 f"An error occurred while getting the leaderboard: {e}"
             , guild=guild_model)
@@ -978,7 +1022,17 @@ class Stats(commands.Cog):
             guild_data = None
             guild_model = None
             try:
-                guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
+                # Get guild data with enhanced lookup
+                guild_id = ctx.guild.id
+                logger.info(f"Looking up guild data for guild ID: {guild_id} (type: {type(guild_id)})")
+                
+                # Try string conversion of guild ID first
+                guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
+                if guild_data is None:
+                    # Try with integer ID
+                    # Try string conversion of guild ID first
+                    guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
+                        # Try with integer ID
                 if guild_data is not None:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
@@ -986,9 +1040,17 @@ class Stats(commands.Cog):
                 logger.warning(f"Error getting guild model: {e}")
 
             # Get guild data
-            guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
+            # Get guild data with enhanced lookup
+            guild_id = ctx.guild.id
+            
+            # Try string conversion of guild ID first
+            guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
             if guild_data is None:
-                embed = EmbedBuilder.create_error_embed(
+                # Try with integer ID
+                guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
+            
+            if guild_data is None:
+                embed = await EmbedBuilder.create_error_embed(
                     "Error",
                     "This guild is not set up. Please use the setup commands first."
                 , guild=guild_model)
@@ -998,7 +1060,7 @@ class Stats(commands.Cog):
             # Check if the is not None guild has access to stats feature
             guild = Guild(self.bot.db, guild_data)
             if guild is None or not guild.check_feature_access("stats"):
-                embed = EmbedBuilder.create_error_embed(
+                embed = await EmbedBuilder.create_error_embed(
                     "Premium Feature",
                     "Weapon category statistics is a premium feature. Please upgrade to access this feature."
                 , guild=guild_model)
@@ -1045,7 +1107,7 @@ class Stats(commands.Cog):
             weapons = await cursor.to_list(length=None)
 
             if weapons is None or len(weapons) == 0:
-                embed = EmbedBuilder.create_error_embed(
+                embed = await EmbedBuilder.create_error_embed(
                     "No Data",
                     f"No weapon data found for server {server_name}."
                 , guild=guild_model)
@@ -1067,7 +1129,7 @@ class Stats(commands.Cog):
                 category_stats[category] += kill_count
 
             # Create embed
-            embed = EmbedBuilder.create_base_embed(
+            embed = await EmbedBuilder.create_base_embed(
                 f"Weapon Category Stats",
                 f"Weapon category breakdown on {server_name}"
             , guild=guild_model)
@@ -1107,7 +1169,7 @@ class Stats(commands.Cog):
 
         except Exception as e:
             logger.error(f"Error getting weapon category stats: {e}", exc_info=True)
-            embed = EmbedBuilder.create_error_embed(
+            embed = await EmbedBuilder.create_error_embed(
                 "Error",
                 f"An error occurred while getting weapon category stats: {e}"
             , guild=guild_model)
@@ -1133,7 +1195,16 @@ class Stats(commands.Cog):
             guild_data = None
             guild_model = None
             try:
-                guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
+                # Get guild data with enhanced lookup
+                guild_id = ctx.guild.id
+                logger.info(f"Looking up guild data for guild ID: {guild_id} (type: {type(guild_id)})")
+                
+                # Try string conversion of guild ID first
+                guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
+                if guild_data is None:
+                    # Try with integer ID
+                    guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
+                
                 if guild_data is not None:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
@@ -1141,9 +1212,17 @@ class Stats(commands.Cog):
                 logger.warning(f"Error getting guild model: {e}")
 
             # Get guild data
-            guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
+            # Get guild data with enhanced lookup
+            guild_id = ctx.guild.id
+            
+            # Try string conversion of guild ID first
+            guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
             if guild_data is None:
-                embed = EmbedBuilder.create_error_embed(
+                # Try with integer ID
+                guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
+            
+            if guild_data is None:
+                embed = await EmbedBuilder.create_error_embed(
                     "Error",
                     "This guild is not set up. Please use the setup commands first."
                 , guild=guild_model)
@@ -1153,7 +1232,7 @@ class Stats(commands.Cog):
             # Check if the is not None guild has access to stats feature
             guild = Guild(self.bot.db, guild_data)
             if guild is None or not guild.check_feature_access("stats"):
-                embed = EmbedBuilder.create_error_embed(
+                embed = await EmbedBuilder.create_error_embed(
                     "Premium Feature",
                     "Weapon statistics is a premium feature. Please upgrade to access this feature."
                 , guild=guild_model)
@@ -1211,7 +1290,7 @@ class Stats(commands.Cog):
             weapon_stats = await cursor.to_list(length=None)
 
             if weapon_stats is None or len(weapon_stats) == 0:
-                embed = EmbedBuilder.create_error_embed(
+                embed = await EmbedBuilder.create_error_embed(
                     "No Data",
                     f"No data found for weapons matching '{weapon_name}' on server {server_name}."
                 , guild=guild_model)
@@ -1258,7 +1337,7 @@ class Stats(commands.Cog):
                 weapon_details = get_weapon_details(weapon_name)
 
                 # Create embed with weapon category
-                embed = EmbedBuilder.create_base_embed(
+                embed = await EmbedBuilder.create_base_embed(
                     f"{weapon_name} Statistics",
                     f"Weapon statistics on {server_name}"
                 , guild=guild_model)
@@ -1341,7 +1420,7 @@ class Stats(commands.Cog):
 
         except Exception as e:
             logger.error(f"Error getting weapon stats: {e}", exc_info=True)
-            embed = EmbedBuilder.create_error_embed(
+            embed = await EmbedBuilder.create_error_embed(
                 "Error",
                 f"An error occurred while getting weapon stats: {e}"
             , guild=guild_model)

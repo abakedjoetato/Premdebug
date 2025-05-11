@@ -2806,26 +2806,40 @@ class CSVProcessorCog(commands.Cog):
         try:
             logger.info(f"Clearing existing stats for server {server_id}")
             
+            # Check if database is initialized
+            if self.bot.db is None:
+                logger.error(f"Database not initialized, cannot clear stats for server {server_id}")
+                return False
+                
             # Clear kill events to rebuild from scratch
-            kill_result = await self.bot.db.kills.delete_many({"server_id": server_id})
-            logger.info(f"Deleted {kill_result.deleted_count} existing kill events for server {server_id}")
+            if hasattr(self.bot.db, 'kills'):
+                kill_result = await self.bot.db.kills.delete_many({"server_id": server_id})
+                logger.info(f"Deleted {kill_result.deleted_count} existing kill events for server {server_id}")
+            else:
+                logger.error("Database connection exists but 'kills' collection not accessible")
             
             # Reset player stats
-            player_result = await self.bot.db.players.update_many(
-                {"server_id": server_id},
-                {"$set": {
-                    "kills": 0,
-                    "deaths": 0,
-                    "last_updated": datetime.now(),
-                    "last_seen": datetime.now()
-                }}
-            )
-            logger.warning(f"CRITICAL FIX: Reset stats for {player_result.modified_count} players for server {server_id}")
+            if hasattr(self.bot.db, 'players'):
+                player_result = await self.bot.db.players.update_many(
+                    {"server_id": server_id},
+                    {"$set": {
+                        "kills": 0,
+                        "deaths": 0,
+                        "last_updated": datetime.now(),
+                        "last_seen": datetime.now()
+                    }}
+                )
+                logger.warning(f"CRITICAL FIX: Reset stats for {player_result.modified_count} players for server {server_id}")
+            else:
+                logger.error("Database connection exists but 'players' collection not accessible")
             
             # Clear rivalry data
-            rivalry_result = await self.bot.db.rivalries.delete_many({"server_id": server_id})
-            logger.warning(f"CRITICAL FIX: Deleted {rivalry_result.deleted_count} existing rivalries for server {server_id}")
-            
+            if hasattr(self.bot.db, 'rivalries'):
+                rivalry_result = await self.bot.db.rivalries.delete_many({"server_id": server_id})
+                logger.warning(f"CRITICAL FIX: Deleted {rivalry_result.deleted_count} existing rivalries for server {server_id}")
+            else:
+                logger.error("Database connection exists but 'rivalries' collection not accessible")
+                
             logger.warning(f"CRITICAL FIX: Successfully reset all stats for historical parse of server {server_id}")
         except Exception as e:
             logger.error(f"CRITICAL FIX: Error clearing stats: {e}")
@@ -2944,20 +2958,34 @@ class CSVProcessorCog(commands.Cog):
                 try:
                     logger.info(f"Clearing existing data for server {resolved_server_id} before historical parse")
 
+                    # Check if database is initialized
+                    if self.bot.db is None:
+                        logger.error(f"Database not initialized, cannot clear stats for server {resolved_server_id}")
+                        return False
+                        
                     # Delete all kill events for this server
-                    kill_result = await self.bot.db.kills.delete_many({"server_id": resolved_server_id})
-                    logger.info(f"Deleted {kill_result.deleted_count} existing kill events for server {resolved_server_id}")
+                    if hasattr(self.bot.db, 'kills'):
+                        kill_result = await self.bot.db.kills.delete_many({"server_id": resolved_server_id})
+                        logger.info(f"Deleted {kill_result.deleted_count} existing kill events for server {resolved_server_id}")
+                    else:
+                        logger.error("Database connection exists but 'kills' collection not accessible")
 
                     # Update player stats to reset kill/death/suicide counts
-                    player_reset = await self.bot.db.players.update_many(
-                        {"server_id": resolved_server_id},
-                        {"$set": {"kills": 0, "deaths": 0, "suicides": 0, "updated_at": datetime.utcnow()}}
-                    )
-                    logger.info(f"Reset stats for {player_reset.modified_count} players for server {resolved_server_id}")
+                    if hasattr(self.bot.db, 'players'):
+                        player_reset = await self.bot.db.players.update_many(
+                            {"server_id": resolved_server_id},
+                            {"$set": {"kills": 0, "deaths": 0, "suicides": 0, "updated_at": datetime.utcnow()}}
+                        )
+                        logger.info(f"Reset stats for {player_reset.modified_count} players for server {resolved_server_id}")
+                    else:
+                        logger.error("Database connection exists but 'players' collection not accessible")
 
                     # Clear rivalry data
-                    rivalry_result = await self.bot.db.rivalries.delete_many({"server_id": resolved_server_id})
-                    logger.info(f"Deleted {rivalry_result.deleted_count} existing rivalries for server {resolved_server_id}")
+                    if hasattr(self.bot.db, 'rivalries'):
+                        rivalry_result = await self.bot.db.rivalries.delete_many({"server_id": resolved_server_id})
+                        logger.info(f"Deleted {rivalry_result.deleted_count} existing rivalries for server {resolved_server_id}")
+                    else:
+                        logger.error("Database connection exists but 'rivalries' collection not accessible")
 
                     # Force garbage collection to free up memory
                     import gc
@@ -3178,7 +3206,7 @@ class CSVProcessorCog(commands.Cog):
                     logger.info(f"Using default server ID from guild config: {raw_server_id} (standardized to {server_id})")
                 else:
                     # No default server configured
-                    embed = EmbedBuilder.error(
+                    embed = await EmbedBuilder.create_error_embed(
                         title="No Server Configured",
                         description="No server ID provided and no default server configured for this guild."
                     )
@@ -3186,7 +3214,7 @@ class CSVProcessorCog(commands.Cog):
                     return
             except Exception as e:
                 logger.error(f"Error getting default server ID: {e}")
-                embed = EmbedBuilder.error(
+                embed = await EmbedBuilder.create_error_embed(
                     title="Configuration Error",
                     description="An error occurred while retrieving the server configuration."
                 )
@@ -3214,7 +3242,7 @@ class CSVProcessorCog(commands.Cog):
 
             # If still not found, show error
             if server_id not in server_configs:
-                embed = EmbedBuilder.error(
+                embed = await EmbedBuilder.create_error_embed(
                     title="Server Not Found",
                     description=f"No SFTP configuration found for server `{server_id}`."
                 )
@@ -3246,12 +3274,12 @@ class CSVProcessorCog(commands.Cog):
                     files_processed, events_processed = 0, 0
 
                 if files_processed > 0:
-                    embed = EmbedBuilder.success(
+                    embed = await EmbedBuilder.create_success_embed(
                         title="CSV Processing Complete",
                         description=f"Processed {files_processed} file(s) with {events_processed} death events."
                     )
                 else:
-                    embed = EmbedBuilder.info(
+                    embed = await EmbedBuilder.create_info_embed(
                         title="No Files Found",
                         description=f"No new CSV files found for server `{server_id}` in the last {hours} hours."
                     )
@@ -3260,7 +3288,7 @@ class CSVProcessorCog(commands.Cog):
 
             except Exception as e:
                 logger.error(f"Error processing CSV files: {str(e)}")
-                embed = EmbedBuilder.error(
+                embed = await EmbedBuilder.create_error_embed(
                     title="Processing Error",
                     description=f"An error occurred while processing CSV files: {str(e)}"
                 )
@@ -3282,7 +3310,7 @@ class CSVProcessorCog(commands.Cog):
         # Clear cache
         self.csv_parser.clear_cache()
 
-        embed = EmbedBuilder.success(
+        embed = await EmbedBuilder.create_success_embed(
             title="Cache Cleared",
             description="The CSV parser cache has been cleared."
         )
@@ -3329,7 +3357,7 @@ class CSVProcessorCog(commands.Cog):
                     server_id = safe_standardize_server_id(raw_server_id)
                     logger.info(f"Using default server ID from guild config: {raw_server_id} (standardized to {server_id})")
                 else:
-                    embed = EmbedBuilder.error(
+                    embed = await EmbedBuilder.create_error_embed(
                         title="No Server Configured",
                         description="No server ID provided and no default server configured for this guild."
                     )
@@ -3337,7 +3365,7 @@ class CSVProcessorCog(commands.Cog):
                     return
             except Exception as e:
                 logger.error(f"Error getting default server ID: {e}")
-                embed = EmbedBuilder.error(
+                embed = await EmbedBuilder.create_error_embed(
                     title="Configuration Error",
                     description="An error occurred while retrieving the server configuration."
                 )
@@ -3365,7 +3393,7 @@ class CSVProcessorCog(commands.Cog):
 
             # If still not found, show error
             if server_id not in server_configs:
-                embed = EmbedBuilder.error(
+                embed = await EmbedBuilder.create_error_embed(
                     title="Server Not Found",
                     description=f"No SFTP configuration found for server `{server_id}`."
                 )
@@ -3376,7 +3404,7 @@ class CSVProcessorCog(commands.Cog):
         safe_days = max(1, min(int(days) if days else 30, 90))  # Between 1 and 90 days
 
         # Send initial response
-        embed = EmbedBuilder.info(
+        embed = await EmbedBuilder.create_info_embed(
             title="Historical Parsing Started",
             description=f"Starting historical parsing for server `{server_id}` looking back {safe_days} days.\n\nThis may take some time, please wait..."
         )
@@ -3446,12 +3474,12 @@ class CSVProcessorCog(commands.Cog):
                     logger.error(f"Error calculating enhanced statistics: {str(e)}")
                     description = f"Processed {files_processed} historical file(s) with {events_processed} death events."
 
-                embed = EmbedBuilder.success(
+                embed = await EmbedBuilder.create_success_embed(
                     title="Historical Parsing Complete",
                     description=description
                 )
             else:
-                embed = EmbedBuilder.info(
+                embed = await EmbedBuilder.create_info_embed(
                     title="No Historical Files Found",
                     description=f"No historical CSV files found for server `{server_id}` in the last {safe_days} days."
                 )
@@ -3459,7 +3487,7 @@ class CSVProcessorCog(commands.Cog):
             await interaction.followup.send(embed=embed, ephemeral=True)
         except Exception as e:
             logger.error(f"Error in historical parse command: {e}")
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Processing Error",
                 description=f"An error occurred during historical parsing: {str(e)}"
             )
@@ -3513,7 +3541,7 @@ class CSVProcessorCog(commands.Cog):
         
         servers_list = "\n".join([f"• {config.get('name', sid)}" for sid, config in guild_servers.items()])
         
-        embed = EmbedBuilder.warning(
+        embed = await EmbedBuilder.create_warning_embed(
             title="⚠️ Reset All Player Statistics?",
             description=f"This will completely reset and rebuild ALL statistics for the following server(s):\n\n{servers_list}\n\n" +
                       f"The system will look back {days} days to rebuild statistics.\n\n" +
@@ -3544,7 +3572,7 @@ class CSVProcessorCog(commands.Cog):
                     logger.error(f"Error in reset_stats for server {server_id}: {str(e)}")
                     results.append(f"• **{server_id}**: Error - {str(e)}")
             
-            result_embed = EmbedBuilder.success(
+            result_embed = await EmbedBuilder.create_success_embed(
                 title="Statistics Reset Complete",
                 description=f"Successfully processed server statistics:\n\n{''.join(results)}"
             )
@@ -3555,7 +3583,7 @@ class CSVProcessorCog(commands.Cog):
             
         async def on_cancel(cancel_interaction):
             await cancel_interaction.response.defer(ephemeral=True)
-            cancel_embed = EmbedBuilder.info(
+            cancel_embed = await EmbedBuilder.create_info_embed(
                 title="Reset Cancelled",
                 description="Statistics reset operation was cancelled."
             )
@@ -3585,7 +3613,7 @@ class CSVProcessorCog(commands.Cog):
         server_configs = await self._get_server_configs()
 
         # Create status embed
-        embed = EmbedBuilder.info(
+        embed = await EmbedBuilder.create_info_embed(
             title="CSV Processor Status",
             description="Current status of the CSV processor"
         )

@@ -224,7 +224,11 @@ class BountiesCog(commands.GroupCog, name="bounty"):
 
             # Announce the bounty in the configured channel
             # Reuse the existing DB connection
-            guild_data = await db.db.guilds.find_one({"guild_id": guild_id})
+            # Try string conversion of guild ID first
+            guild_data = await db.db.guilds.find_one({"guild_id": str(guild_id)})
+            if guild_data is None:
+                # Try with integer ID
+                guild_data = await db.db.guilds.find_one({"guild_id": int(guild_id)})
             if guild_data is not None:
                 bounty_channel_id = guild_data.get("bounty_channel")
                 if bounty_channel_id is not None:
@@ -259,7 +263,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
                 color=discord.Color.red()
             )
             return embed
-        # Get the base embed
+        # Get the base embed - use static method as this is not an async function
         embed = EmbedBuilder.info(title=title)
 
         # Set the description
@@ -312,7 +316,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
         """
         if not bounties or len(bounties) == 0:
             # No bounties
-            embed = EmbedBuilder.info(
+            embed = await EmbedBuilder.create_info_embed(
                 title="No Active Bounties", 
                 description="There are no active bounties at this time."
             )
@@ -327,7 +331,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
             page_bounties = bounties[i:i+5]
 
             # Create embed for this page
-            embed = EmbedBuilder.info(
+            embed = await EmbedBuilder.create_info_embed(
                 title=f"Active Bounties (Page {len(pages)+1}/{(len(bounties)-1)//5+1})",
                 description="Here are the currently active bounties:"
             )
@@ -682,7 +686,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
 
             # Create the embed
             if not bounties or len(bounties) == 0:
-                embed = EmbedBuilder.info(
+                embed = await EmbedBuilder.create_info_embed(
                     title=title,
                     description=f"You haven't {view_type} any bounties on this server."
                 )
@@ -690,7 +694,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
                 return
 
             # Create pages
-            embed = EmbedBuilder.info(
+            embed = await EmbedBuilder.create_info_embed(
                 title=title,
                 description=f"Here are your most recent {view_type} bounties on this server:"
             )
@@ -785,7 +789,11 @@ class BountiesCog(commands.GroupCog, name="bounty"):
             db = await get_db()
 
             # Get guild data
-            guild_data = await db.db.guilds.find_one({"guild_id": guild_id})
+            # Try string conversion of guild ID first
+            guild_data = await db.db.guilds.find_one({"guild_id": str(guild_id)})
+            if guild_data is None:
+                # Try with integer ID
+                guild_data = await db.db.guilds.find_one({"guild_id": int(guild_id)})
             if guild_data is None:
                 await interaction.followup.send(
                     "Error: Guild not found in database.",
@@ -887,7 +895,7 @@ class BountiesCog(commands.GroupCog, name="bounty"):
             )
 
             # Send confirmation
-            embed = EmbedBuilder.success(
+            embed = await EmbedBuilder.create_success_embed(
                 title="Bounty Settings Updated",
                 description=message
             )

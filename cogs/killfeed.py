@@ -47,7 +47,15 @@ class Killfeed(commands.Cog):
             guild_data = None
             guild_model = None
             try:
-                guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
+                # Get guild data with enhanced lookup
+                guild_id = ctx.guild.id
+                
+                # Try string conversion of guild ID first
+                guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
+                if guild_data is None:
+                    # Try with integer ID
+                    guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
+                
                 if guild_data is not None:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
@@ -59,9 +67,17 @@ class Killfeed(commands.Cog):
                 return
 
             # Get guild data
-            guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
+            # Get guild data with enhanced lookup
+            guild_id = ctx.guild.id
+            
+            # Try string conversion of guild ID first
+            guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
             if guild_data is None:
-                embed = EmbedBuilder.create_error_embed(
+                # Try with integer ID
+                guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
+            
+            if guild_data is None:
+                embed = await EmbedBuilder.create_error_embed(
                     "Error",
                     "This guild is not set up. Please use the setup commands first."
                 , guild=guild_model)
@@ -76,7 +92,7 @@ class Killfeed(commands.Cog):
                     break
 
             if server_exists is None:
-                embed = EmbedBuilder.create_error_embed(
+                embed = await EmbedBuilder.create_error_embed(
                     "Error",
                     f"Server '{server_id}' not found in this guild. Please use an existing server name."
                 , guild=guild_model)
@@ -92,7 +108,7 @@ class Killfeed(commands.Cog):
                 if self.bot.background_tasks[task_name].done():
                     self.bot.background_tasks.pop(task_name)
                 else:
-                    embed = EmbedBuilder.create_error_embed(
+                    embed = await EmbedBuilder.create_error_embed(
                         "Already Running",
                         f"Killfeed monitor for server {server_id} is already running."
                     , guild=guild_model)
@@ -100,7 +116,7 @@ class Killfeed(commands.Cog):
                     return
 
             # Create initial response
-            embed = EmbedBuilder.create_base_embed(
+            embed = await EmbedBuilder.create_base_embed(
                 "Starting Killfeed Monitor",
                 f"Starting killfeed monitor for server {server_id}..."
             , guild=guild_model)
@@ -121,7 +137,7 @@ class Killfeed(commands.Cog):
 
             # Update response after a short delay
             await asyncio.sleep(2)
-            embed = EmbedBuilder.create_success_embed(
+            embed = await EmbedBuilder.create_success_embed(
                 "Killfeed Monitor Started",
                 f"Killfeed monitor for server {server_id} has been started successfully."
             , guild=guild_model)
@@ -129,7 +145,7 @@ class Killfeed(commands.Cog):
 
         except Exception as e:
             logger.error(f"Error starting killfeed monitor: {e}", exc_info=True)
-            embed = EmbedBuilder.create_error_embed(
+            embed = await EmbedBuilder.create_error_embed(
                 "Error",
                 f"An error occurred while starting the killfeed monitor: {e}"
             , guild=guild_model)
@@ -147,7 +163,15 @@ class Killfeed(commands.Cog):
             guild_data = None
             guild_model = None
             try:
-                guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
+                # Get guild data with enhanced lookup
+                guild_id = ctx.guild.id
+                
+                # Try string conversion of guild ID first
+                guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
+                if guild_data is None:
+                    # Try with integer ID
+                    guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
+                
                 if guild_data is not None:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
@@ -161,7 +185,7 @@ class Killfeed(commands.Cog):
             # Check if task is running
             task_name = f"killfeed_{ctx.guild.id}_{server_id}"
             if task_name not in self.bot.background_tasks:
-                embed = EmbedBuilder.create_error_embed(
+                embed = await EmbedBuilder.create_error_embed(
                     "Not Running",
                     f"Killfeed monitor for server {server_id} is not running."
                 , guild=guild_model)
@@ -176,7 +200,7 @@ class Killfeed(commands.Cog):
             self.bot.background_tasks.pop(task_name)
 
             # Send success message
-            embed = EmbedBuilder.create_success_embed(
+            embed = await EmbedBuilder.create_success_embed(
                 "Killfeed Monitor Stopped",
                 f"Killfeed monitor for server {server_id} has been stopped successfully."
             , guild=guild_model)
@@ -184,7 +208,7 @@ class Killfeed(commands.Cog):
 
         except Exception as e:
             logger.error(f"Error stopping killfeed monitor: {e}", exc_info=True)
-            embed = EmbedBuilder.create_error_embed(
+            embed = await EmbedBuilder.create_error_embed(
                 "Error",
                 f"An error occurred while stopping the killfeed monitor: {e}"
             , guild=guild_model)
@@ -200,7 +224,15 @@ class Killfeed(commands.Cog):
             guild_data = None
             guild_model = None
             try:
-                guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
+                # Get guild data with enhanced lookup
+                guild_id = ctx.guild.id
+                
+                # Try string conversion of guild ID first
+                guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
+                if guild_data is None:
+                    # Try with integer ID
+                    guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
+                
                 if guild_data is not None:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
@@ -208,9 +240,17 @@ class Killfeed(commands.Cog):
                 logger.warning(f"Error getting guild model: {e}")
 
             # Get guild data
-            guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
+            # Get guild data with enhanced lookup
+            guild_id = ctx.guild.id
+            
+            # Try string conversion of guild ID first
+            guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
             if guild_data is None:
-                embed = EmbedBuilder.create_error_embed(
+                # Try with integer ID
+                guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
+            
+            if guild_data is None:
+                embed = await EmbedBuilder.create_error_embed(
                     "Error",
                     "This guild is not set up. Please use the setup commands first."
                 , guild=guild_model)
@@ -240,7 +280,7 @@ class Killfeed(commands.Cog):
 
             # Create embed
             if running_monitors:
-                embed = EmbedBuilder.create_base_embed(
+                embed = await EmbedBuilder.create_base_embed(
                     "Killfeed Monitor Status",
                     f"Currently running killfeed monitors for {ctx.guild.name}"
                 , guild=guild_model)
@@ -252,7 +292,7 @@ class Killfeed(commands.Cog):
                         inline=False
                     )
             else:
-                embed = EmbedBuilder.create_base_embed(
+                embed = await EmbedBuilder.create_base_embed(
                     "Killfeed Monitor Status",
                     f"No killfeed monitors are currently running for {ctx.guild.name}."
                 , guild=guild_model)
@@ -268,7 +308,7 @@ class Killfeed(commands.Cog):
 
         except Exception as e:
             logger.error(f"Error checking killfeed status: {e}", exc_info=True)
-            embed = EmbedBuilder.create_error_embed(
+            embed = await EmbedBuilder.create_error_embed(
                 "Error",
                 f"An error occurred while checking killfeed status: {e}"
             , guild=guild_model)
@@ -506,7 +546,7 @@ async def start_killfeed_monitor(bot, guild_id: int, server_id: str):
         if channel_configured and killfeed_channel:
             try:
                 guild_model = await Guild.get_by_id(bot.db, guild_id)
-                embed = EmbedBuilder.create_base_embed(
+                embed = await EmbedBuilder.create_base_embed(
                     "Killfeed Monitor Active",
                     f"Monitoring killfeed for server {server.name} (ID: {server_id}).",
                     guild=guild_model

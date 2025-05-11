@@ -48,12 +48,8 @@ class Bot(commands.Bot):
         # Additional bot-specific attributes
         self.home_guild_id = os.environ.get("HOME_GUILD_ID")
         
-        # Set owner ID from environment variable if available
-        if os.environ.get("OWNER_ID"):
-            self.owner_id = int(os.environ.get("OWNER_ID"))
-        elif os.environ.get("REPL_OWNER_ID"):
-            # Fallback to REPL_OWNER_ID if present
-            self.owner_id = int(os.environ.get("REPL_OWNER_ID"))
+        # Set owner ID (hard-coded per user request)
+        self.owner_id = 462961235382763520
 
         # Extension loading state tracking
         self.loaded_extensions = []

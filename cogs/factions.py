@@ -57,7 +57,7 @@ class FactionsCog(commands.Cog):
         player_link = await PlayerLink.get_by_discord_id(interaction.user.id)
         if player_link is None:
             # No player link found, inform user
-            embed = EmbedBuilder.warning(
+            embed = await EmbedBuilder.create_warning_embed(
                 title="No Linked Player",
                 description="You don't have any linked players. Use `/link player` to link your Discord account to an in-game player."
             )
@@ -68,7 +68,7 @@ class FactionsCog(commands.Cog):
         player_id = player_link.get_player_id_for_server(server_id)
         if player_id is None:
             # No player on this server, inform user
-            embed = EmbedBuilder.warning(
+            embed = await EmbedBuilder.create_warning_embed(
                 title="No Player on Server",
                 description=f"You don't have a linked player on the selected server. Use `/link player` to link your Discord account to an in-game player."
             )
@@ -95,7 +95,7 @@ class FactionsCog(commands.Cog):
 
         player_link = await PlayerLink.get_by_discord_id(member.id)
         if player_link is None:
-            embed = EmbedBuilder.info(
+            embed = await EmbedBuilder.create_info_embed(
                 title="No Faction",
                 description=f"{member.display_name} doesn't have any linked players or factions."
             )
@@ -105,7 +105,7 @@ class FactionsCog(commands.Cog):
         # Get player ID for server
         player_id = player_link.get_player_id_for_server(server_id)
         if player_id is None:
-            embed = EmbedBuilder.info(
+            embed = await EmbedBuilder.create_info_embed(
                 title="No Faction",
                 description=f"{member.display_name} doesn't have a linked player on this server."
             )
@@ -116,7 +116,7 @@ class FactionsCog(commands.Cog):
         factions = await Faction.get_for_player(server_id, player_id)
 
         if factions is None or len(factions) == 0:
-            embed = EmbedBuilder.info(
+            embed = await EmbedBuilder.create_info_embed(
                 title="No Faction",
                 description=f"{member.display_name} isn't a member of any faction."
             )
@@ -190,7 +190,7 @@ class FactionsCog(commands.Cog):
 
         # Validate faction name and tag
         if not name or len(name) < 3 or len(name) > 32:
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Invalid Faction Name",
                 description="Faction name must be between 3 and 32 characters long."
             )
@@ -198,7 +198,7 @@ class FactionsCog(commands.Cog):
             return
 
         if not tag or len(tag) < 2 or len(tag) > 10:
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Invalid Faction Tag",
                 description="Faction tag must be between 2 and 10 characters long."
             )
@@ -212,7 +212,7 @@ class FactionsCog(commands.Cog):
                 try:
                     faction_color = int(color[1:], 16)
                 except ValueError:
-                    embed = EmbedBuilder.error(
+                    embed = await EmbedBuilder.create_error_embed(
                         title="Invalid Color",
                         description="Invalid hex color code. Use format #RRGGBB."
                     )
@@ -221,7 +221,7 @@ class FactionsCog(commands.Cog):
             elif color.lower() in EmbedBuilder.FACTION_COLORS:
                 faction_color = EmbedBuilder.FACTION_COLORS[color.lower()]
             else:
-                embed = EmbedBuilder.error(
+                embed = await EmbedBuilder.create_error_embed(
                     title="Invalid Color",
                     description="Invalid color name. Use a hex code (#RRGGBB) or one of the following: red, blue, green, gold, purple, orange, teal, dark_blue."
                 )
@@ -231,7 +231,7 @@ class FactionsCog(commands.Cog):
         # Check if player is already in a faction
         existing_factions = await Faction.get_for_player(server_id, player_id)
         if existing_factions is not None and len(existing_factions) > 0:
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Already in Faction",
                 description=f"You are already a member of {existing_factions[0].name}. Leave your current faction before creating a new one."
             )
@@ -250,7 +250,7 @@ class FactionsCog(commands.Cog):
             )
 
             # Create success embed
-            embed = EmbedBuilder.success(
+            embed = await EmbedBuilder.create_success_embed(
                 title="Faction Created",
                 description=f"You have successfully created the faction **{name}** [{tag}]."
             )
@@ -272,7 +272,7 @@ class FactionsCog(commands.Cog):
             await interaction.followup.send(embed=embed, ephemeral=False)
 
         except ValueError as e:
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Error Creating Faction",
                 description=str(e)
             )
@@ -307,7 +307,7 @@ class FactionsCog(commands.Cog):
 
         # Get faction by name or tag
         if not name:
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Missing Faction Name",
                 description="Please provide a faction name or tag."
             )
@@ -320,7 +320,7 @@ class FactionsCog(commands.Cog):
             faction = await Faction.get_by_tag(server_id, name)
 
         if faction is None:
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Faction Not Found",
                 description=f"No faction found with name or tag '{name}'."
             )
@@ -392,7 +392,7 @@ class FactionsCog(commands.Cog):
         factions = await Faction.get_all(server_id)
 
         if factions is None or len(factions) == 0:
-            embed = EmbedBuilder.info(
+            embed = await EmbedBuilder.create_info_embed(
                 title="No Factions",
                 description="There are no factions on this server yet. Use `/faction create` to create one."
             )
@@ -442,7 +442,7 @@ class FactionsCog(commands.Cog):
 
         # Get faction by name or tag
         if not name:
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Missing Faction Name",
                 description="Please provide a faction name or tag."
             )
@@ -455,7 +455,7 @@ class FactionsCog(commands.Cog):
             faction = await Faction.get_by_tag(server_id, name)
 
         if faction is None:
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Faction Not Found",
                 description=f"No faction found with name or tag '{name}'."
             )
@@ -465,7 +465,7 @@ class FactionsCog(commands.Cog):
         # Check if player is already in a faction
         existing_factions = await Faction.get_for_player(server_id, player_id)
         if existing_factions is not None:
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Already in Faction",
                 description=f"You are already a member of {existing_factions[0].name}. Leave your current faction before joining a new one."
             )
@@ -474,7 +474,7 @@ class FactionsCog(commands.Cog):
 
         # Check if faction requires approval
         if faction.require_approval:
-            embed = EmbedBuilder.warning(
+            embed = await EmbedBuilder.create_warning_embed(
                 title="Approval Required",
                 description=f"This faction requires approval to join. Please contact the faction leader."
             )
@@ -483,7 +483,7 @@ class FactionsCog(commands.Cog):
 
         # Check if faction is full
         if faction.member_count >= 100:
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Faction Full",
                 description=f"This faction is full and cannot accept more members."
             )
@@ -495,7 +495,7 @@ class FactionsCog(commands.Cog):
             await faction.add_member(player_id)
 
             # Create success embed
-            embed = EmbedBuilder.success(
+            embed = await EmbedBuilder.create_success_embed(
                 title="Faction Joined",
                 description=f"You have successfully joined **{faction.name}** [{faction.tag}]."
             )
@@ -503,7 +503,7 @@ class FactionsCog(commands.Cog):
             await interaction.followup.send(embed=embed)
 
         except ValueError as e:
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Error Joining Faction",
                 description=str(e)
             )
@@ -542,7 +542,7 @@ class FactionsCog(commands.Cog):
         factions = await Faction.get_for_player(server_id, player_id)
 
         if factions is None or len(factions) == 0:
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="No Faction",
                 description="You are not a member of any faction."
             )
@@ -554,7 +554,7 @@ class FactionsCog(commands.Cog):
 
         # Check if player is the faction leader
         if faction.leader_id == player_id:
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Faction Leader",
                 description="You are the leader of this faction. Transfer leadership with `/faction promote` before leaving."
             )
@@ -569,7 +569,7 @@ class FactionsCog(commands.Cog):
         )
 
         if not confirmed:
-            embed = EmbedBuilder.info(
+            embed = await EmbedBuilder.create_info_embed(
                 title="Action Cancelled",
                 description="You have cancelled leaving the faction."
             )
@@ -581,7 +581,7 @@ class FactionsCog(commands.Cog):
             await faction.remove_member(player_id)
 
             # Create success embed
-            embed = EmbedBuilder.success(
+            embed = await EmbedBuilder.create_success_embed(
                 title="Faction Left",
                 description=f"You have successfully left **{faction.name}** [{faction.tag}]."
             )
@@ -589,7 +589,7 @@ class FactionsCog(commands.Cog):
             await interaction.followup.send(embed=embed)
 
         except ValueError as e:
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Error Leaving Faction",
                 description=str(e)
             )
@@ -623,7 +623,7 @@ class FactionsCog(commands.Cog):
 
         # Check admin permissions
         if not has_admin_permission(interaction):
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Permission Denied",
                 description="You don't have permission to use this command."
             )
@@ -637,7 +637,7 @@ class FactionsCog(commands.Cog):
 
         # Get faction by name or tag
         if faction_name is None:
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Missing Faction Name",
                 description="Please provide a faction name or tag."
             )
@@ -650,7 +650,7 @@ class FactionsCog(commands.Cog):
             faction = await Faction.get_by_tag(server_id, faction_name)
 
         if faction is None:
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Faction Not Found",
                 description=f"No faction found with name or tag '{faction_name}'."
             )
@@ -659,7 +659,7 @@ class FactionsCog(commands.Cog):
 
         # Validate player name
         if player_name is None:
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Missing Player Name",
                 description="Please provide a player name."
             )
@@ -676,7 +676,7 @@ class FactionsCog(commands.Cog):
             await faction.add_member(player_id)
 
             # Create success embed
-            embed = EmbedBuilder.success(
+            embed = await EmbedBuilder.create_success_embed(
                 title="Player Added",
                 description=f"Successfully added **{player_name}** to **{faction.name}** [{faction.tag}]."
             )
@@ -684,7 +684,7 @@ class FactionsCog(commands.Cog):
             await interaction.followup.send(embed=embed)
 
         except ValueError as e:
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Error Adding Player",
                 description=str(e)
             )
@@ -718,7 +718,7 @@ class FactionsCog(commands.Cog):
 
         # Check admin permissions
         if not has_admin_permission(interaction):
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Permission Denied",
                 description="You don't have permission to use this command."
             )
@@ -732,7 +732,7 @@ class FactionsCog(commands.Cog):
 
         # Get faction by name or tag
         if faction_name is None:
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Missing Faction Name",
                 description="Please provide a faction name or tag."
             )
@@ -745,7 +745,7 @@ class FactionsCog(commands.Cog):
             faction = await Faction.get_by_tag(server_id, faction_name)
 
         if faction is None:
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Faction Not Found",
                 description=f"No faction found with name or tag '{faction_name}'."
             )
@@ -754,7 +754,7 @@ class FactionsCog(commands.Cog):
 
         # Validate player name
         if player_name is None:
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Missing Player Name",
                 description="Please provide a player name."
             )
@@ -768,7 +768,7 @@ class FactionsCog(commands.Cog):
 
         # Check if player is the faction leader
         if faction.leader_id == player_id:
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Cannot Remove Leader",
                 description="Cannot remove the faction leader. Transfer leadership first."
             )
@@ -780,7 +780,7 @@ class FactionsCog(commands.Cog):
             await faction.remove_member(player_id)
 
             # Create success embed
-            embed = EmbedBuilder.success(
+            embed = await EmbedBuilder.create_success_embed(
                 title="Player Removed",
                 description=f"Successfully removed **{player_name}** from **{faction.name}** [{faction.tag}]."
             )
@@ -788,7 +788,7 @@ class FactionsCog(commands.Cog):
             await interaction.followup.send(embed=embed)
 
         except ValueError as e:
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Error Removing Player",
                 description=str(e)
             )
@@ -837,7 +837,7 @@ class FactionsCog(commands.Cog):
             # Try to get player's faction
             factions = await Faction.get_for_player(server_id, player_id)
             if factions is None or len(factions) == 0:
-                embed = EmbedBuilder.error(
+                embed = await EmbedBuilder.create_error_embed(
                     title="No Faction",
                     description="You are not a member of any faction."
                 )
@@ -852,7 +852,7 @@ class FactionsCog(commands.Cog):
                 faction = await Faction.get_by_tag(server_id, faction_name)
 
             if faction is None:
-                embed = EmbedBuilder.error(
+                embed = await EmbedBuilder.create_error_embed(
                     title="Faction Not Found",
                     description=f"No faction found with name or tag '{faction_name}'."
                 )
@@ -861,7 +861,7 @@ class FactionsCog(commands.Cog):
 
         # Check if player is the faction leader
         if faction.leader_id != player_id and not has_admin_permission(interaction):
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Permission Denied",
                 description="Only the faction leader can promote members."
             )
@@ -870,7 +870,7 @@ class FactionsCog(commands.Cog):
 
         # Validate player name
         if player_name is None:
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Missing Player Name",
                 description="Please provide a player name."
             )
@@ -891,7 +891,7 @@ class FactionsCog(commands.Cog):
                 break
 
         if target_in_faction is None:
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Player Not in Faction",
                 description=f"**{player_name}** is not a member of **{faction.name}**."
             )
@@ -900,7 +900,7 @@ class FactionsCog(commands.Cog):
 
         # Validate role
         if role not in FACTION_ROLES:
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Invalid Role",
                 description=f"Invalid role '{role}'. Must be one of: {', '.join(FACTION_ROLES)}."
             )
@@ -916,7 +916,7 @@ class FactionsCog(commands.Cog):
             )
 
             if not confirmed:
-                embed = EmbedBuilder.info(
+                embed = await EmbedBuilder.create_info_embed(
                     title="Action Cancelled",
                     description="Leadership transfer cancelled."
                 )
@@ -929,7 +929,7 @@ class FactionsCog(commands.Cog):
 
             # Create success embed
             action = "Transferred leadership to" if role == "leader" else f"Promoted to {role}"
-            embed = EmbedBuilder.success(
+            embed = await EmbedBuilder.create_success_embed(
                 title="Member Promoted",
                 description=f"Successfully {action} **{player_name}** in **{faction.name}** [{faction.tag}]."
             )
@@ -937,7 +937,7 @@ class FactionsCog(commands.Cog):
             await interaction.followup.send(embed=embed)
 
         except ValueError as e:
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Error Promoting Member",
                 description=str(e)
             )
@@ -991,7 +991,7 @@ class FactionsCog(commands.Cog):
             # Try to get player's faction
             factions = await Faction.get_for_player(server_id, player_id)
             if factions is None or len(factions) == 0:
-                embed = EmbedBuilder.error(
+                embed = await EmbedBuilder.create_error_embed(
                     title="No Faction",
                     description="You are not a member of any faction."
                 )
@@ -1006,7 +1006,7 @@ class FactionsCog(commands.Cog):
                 faction = await Faction.get_by_tag(server_id, faction_name)
 
             if faction is None:
-                embed = EmbedBuilder.error(
+                embed = await EmbedBuilder.create_error_embed(
                     title="Faction Not Found",
                     description=f"No faction found with name or tag '{faction_name}'."
                 )
@@ -1015,7 +1015,7 @@ class FactionsCog(commands.Cog):
 
         # Check if player is the faction leader
         if faction.leader_id != player_id and not has_admin_permission(interaction):
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Permission Denied",
                 description="Only the faction leader can edit faction details."
             )
@@ -1024,7 +1024,7 @@ class FactionsCog(commands.Cog):
 
         # Validate new name and tag
         if new_name and (len(new_name) < 3 or len(new_name) > 32):
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Invalid Faction Name",
                 description="Faction name must be between 3 and 32 characters long."
             )
@@ -1032,7 +1032,7 @@ class FactionsCog(commands.Cog):
             return
 
         if new_tag and (len(new_tag) < 2 or len(new_tag) > 10):
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Invalid Faction Tag",
                 description="Faction tag must be between 2 and 10 characters long."
             )
@@ -1046,7 +1046,7 @@ class FactionsCog(commands.Cog):
                 try:
                     faction_color = int(color[1:], 16)
                 except ValueError:
-                    embed = EmbedBuilder.error(
+                    embed = await EmbedBuilder.create_error_embed(
                         title="Invalid Color",
                         description="Invalid hex color code. Use format #RRGGBB."
                     )
@@ -1055,7 +1055,7 @@ class FactionsCog(commands.Cog):
             elif color.lower() in EmbedBuilder.FACTION_COLORS:
                 faction_color = EmbedBuilder.FACTION_COLORS[color.lower()]
             else:
-                embed = EmbedBuilder.error(
+                embed = await EmbedBuilder.create_error_embed(
                     title="Invalid Color",
                     description="Invalid color name. Use a hex code (#RRGGBB) or one of the following: red, blue, green, gold, purple, orange, teal, dark_blue."
                 )
@@ -1074,7 +1074,7 @@ class FactionsCog(commands.Cog):
             update_data["color"] = faction_color
 
         if not update_data:
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="No Changes",
                 description="No changes specified."
             )
@@ -1086,7 +1086,7 @@ class FactionsCog(commands.Cog):
             await faction.update(update_data)
 
             # Create success embed
-            embed = EmbedBuilder.success(
+            embed = await EmbedBuilder.create_success_embed(
                 title="Faction Updated",
                 description=f"Successfully updated **{faction.name}** [{faction.tag}]."
             )
@@ -1109,7 +1109,7 @@ class FactionsCog(commands.Cog):
             await interaction.followup.send(embed=embed)
 
         except ValueError as e:
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Error Updating Faction",
                 description=str(e)
             )
@@ -1148,7 +1148,7 @@ class FactionsCog(commands.Cog):
                 faction = await Faction.get_by_tag(server_id, faction_name)
 
             if faction is None:
-                embed = EmbedBuilder.error(
+                embed = await EmbedBuilder.create_error_embed(
                     title="Faction Not Found",
                     description=f"No faction found with name or tag '{faction_name}'."
                 )
@@ -1162,7 +1162,7 @@ class FactionsCog(commands.Cog):
 
             factions = await Faction.get_for_player(server_id, player_id)
             if factions is None or len(factions) == 0:
-                embed = EmbedBuilder.error(
+                embed = await EmbedBuilder.create_error_embed(
                     title="No Faction",
                     description="You are not a member of any faction. Specify a faction name to view stats."
                 )
@@ -1176,7 +1176,7 @@ class FactionsCog(commands.Cog):
         stats = faction.stats
 
         # Create stats embed
-        embed = EmbedBuilder.faction(
+        embed = await EmbedBuilder.create_faction_embed(
             faction_name=faction.name,
             faction_tag=faction.tag,
             description=faction.description,
@@ -1236,7 +1236,7 @@ class FactionsCog(commands.Cog):
             # Try to get player's faction
             factions = await Faction.get_for_player(server_id, player_id)
             if factions is None or len(factions) == 0:
-                embed = EmbedBuilder.error(
+                embed = await EmbedBuilder.create_error_embed(
                     title="No Faction",
                     description="You are not a member of any faction."
                 )
@@ -1251,7 +1251,7 @@ class FactionsCog(commands.Cog):
                 faction = await Faction.get_by_tag(server_id, faction_name)
 
             if faction is None:
-                embed = EmbedBuilder.error(
+                embed = await EmbedBuilder.create_error_embed(
                     title="Faction Not Found",
                     description=f"No faction found with name or tag '{faction_name}'."
                 )
@@ -1263,7 +1263,7 @@ class FactionsCog(commands.Cog):
         is_admin = has_admin_permission(interaction)
 
         if not is_leader and not is_admin:
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Permission Denied",
                 description="Only the faction leader or server administrators can delete a faction."
             )
@@ -1278,7 +1278,7 @@ class FactionsCog(commands.Cog):
         )
 
         if not confirmed:
-            embed = EmbedBuilder.info(
+            embed = await EmbedBuilder.create_info_embed(
                 title="Action Cancelled",
                 description="Faction deletion cancelled."
             )
@@ -1290,7 +1290,7 @@ class FactionsCog(commands.Cog):
             await faction.delete()
 
             # Create success embed
-            embed = EmbedBuilder.success(
+            embed = await EmbedBuilder.create_success_embed(
                 title="Faction Deleted",
                 description=f"Successfully deleted **{faction.name}** [{faction.tag}]."
             )
@@ -1298,7 +1298,7 @@ class FactionsCog(commands.Cog):
             await interaction.followup.send(embed=embed)
 
         except ValueError as e:
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Error Deleting Faction",
                 description=str(e)
             )
@@ -1343,7 +1343,7 @@ class FactionsCog(commands.Cog):
             # Try to get player's faction
             factions = await Faction.get_for_player(server_id, player_id)
             if factions is None or len(factions) == 0:
-                embed = EmbedBuilder.error(
+                embed = await EmbedBuilder.create_error_embed(
                     title="No Faction",
                     description="You are not a member of any faction."
                 )
@@ -1358,7 +1358,7 @@ class FactionsCog(commands.Cog):
                 faction = await Faction.get_by_tag(server_id, faction_name)
 
             if faction is None:
-                embed = EmbedBuilder.error(
+                embed = await EmbedBuilder.create_error_embed(
                     title="Faction Not Found",
                     description=f"No faction found with name or tag '{faction_name}'."
                 )
@@ -1370,7 +1370,7 @@ class FactionsCog(commands.Cog):
         is_admin = has_admin_permission(interaction)
 
         if not is_leader and not is_admin:
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Permission Denied",
                 description="Only the faction leader or server administrators can set faction approval requirements."
             )
@@ -1382,7 +1382,7 @@ class FactionsCog(commands.Cog):
             await faction.update({"require_approval": require_approval})
 
             # Create success embed
-            embed = EmbedBuilder.success(
+            embed = await EmbedBuilder.create_success_embed(
                 title="Faction Updated",
                 description=f"Successfully updated approval requirements for **{faction.name}** [{faction.tag}].  Require Approval: {require_approval}"
             )
@@ -1390,7 +1390,7 @@ class FactionsCog(commands.Cog):
             await interaction.followup.send(embed=embed)
 
         except ValueError as e:
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Error Updating Faction",
                 description=str(e)
             )

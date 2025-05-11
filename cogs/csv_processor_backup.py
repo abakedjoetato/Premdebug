@@ -1005,7 +1005,7 @@ class CSVProcessorCog(commands.Cog):
                     logger.info(f"Using default server ID from guild config: {raw_server_id} (standardized to {server_id})")
                 else:
                     # No default server configured
-                    embed = EmbedBuilder.error(
+                    embed = await EmbedBuilder.create_error_embed(
                         title="No Server Configured",
                         description="No server ID provided and no default server configured for this guild."
                     )
@@ -1013,7 +1013,7 @@ class CSVProcessorCog(commands.Cog):
                     return
             except Exception as e:
                 logger.error(f"Error getting default server ID: {e}")
-                embed = EmbedBuilder.error(
+                embed = await EmbedBuilder.create_error_embed(
                     title="Configuration Error",
                     description="An error occurred while retrieving the server configuration."
                 )
@@ -1041,7 +1041,7 @@ class CSVProcessorCog(commands.Cog):
 
             # If still not found, show error
             if server_id not in server_configs:
-                embed = EmbedBuilder.error(
+                embed = await EmbedBuilder.create_error_embed(
                     title="Server Not Found",
                     description=f"No SFTP configuration found for server `{server_id}`."
                 )
@@ -1071,12 +1071,12 @@ class CSVProcessorCog(commands.Cog):
                     files_processed, events_processed = 0, 0
 
                 if files_processed > 0:
-                    embed = EmbedBuilder.success(
+                    embed = await EmbedBuilder.create_success_embed(
                         title="CSV Processing Complete",
                         description=f"Processed {files_processed} file(s) with {events_processed} death events."
                     )
                 else:
-                    embed = EmbedBuilder.info(
+                    embed = await EmbedBuilder.create_info_embed(
                         title="No Files Found",
                         description=f"No new CSV files found for server `{server_id}` in the last {hours} hours."
                     )
@@ -1085,7 +1085,7 @@ class CSVProcessorCog(commands.Cog):
 
             except Exception as e:
                 logger.error(f"Error processing CSV files: {str(e)}")
-                embed = EmbedBuilder.error(
+                embed = await EmbedBuilder.create_error_embed(
                     title="Processing Error",
                     description=f"An error occurred while processing CSV files: {str(e)}"
                 )
@@ -1104,7 +1104,7 @@ class CSVProcessorCog(commands.Cog):
         # Clear cache
         self.csv_parser.clear_cache()
 
-        embed = EmbedBuilder.success(
+        embed = await EmbedBuilder.create_success_embed(
             title="Cache Cleared",
             description="The CSV parser cache has been cleared."
         )
@@ -1146,7 +1146,7 @@ class CSVProcessorCog(commands.Cog):
                     server_id = standardize_server_id(raw_server_id)
                     logger.info(f"Using default server ID from guild config: {raw_server_id} (standardized to {server_id})")
                 else:
-                    embed = EmbedBuilder.error(
+                    embed = await EmbedBuilder.create_error_embed(
                         title="No Server Configured",
                         description="No server ID provided and no default server configured for this guild."
                     )
@@ -1154,7 +1154,7 @@ class CSVProcessorCog(commands.Cog):
                     return
             except Exception as e:
                 logger.error(f"Error getting default server ID: {e}")
-                embed = EmbedBuilder.error(
+                embed = await EmbedBuilder.create_error_embed(
                     title="Configuration Error",
                     description="An error occurred while retrieving the server configuration."
                 )
@@ -1182,7 +1182,7 @@ class CSVProcessorCog(commands.Cog):
 
             # If still not found, show error
             if server_id not in server_configs:
-                embed = EmbedBuilder.error(
+                embed = await EmbedBuilder.create_error_embed(
                     title="Server Not Found",
                     description=f"No SFTP configuration found for server `{server_id}`."
                 )
@@ -1193,7 +1193,7 @@ class CSVProcessorCog(commands.Cog):
         safe_days = max(1, min(int(days) if days else 30, 90))  # Between 1 and 90 days
 
         # Send initial response
-        embed = EmbedBuilder.info(
+        embed = await EmbedBuilder.create_info_embed(
             title="Historical Parsing Started",
             description=f"Starting historical parsing for server `{server_id}` looking back {safe_days} days.\n\nThis may take some time, please wait..."
         )
@@ -1204,12 +1204,12 @@ class CSVProcessorCog(commands.Cog):
             files_processed, events_processed = await self.run_historical_parse(server_id, days=safe_days)
 
             if files_processed > 0:
-                embed = EmbedBuilder.success(
+                embed = await EmbedBuilder.create_success_embed(
                     title="Historical Parsing Complete",
                     description=f"Processed {files_processed} historical file(s) with {events_processed} death events."
                 )
             else:
-                embed = EmbedBuilder.info(
+                embed = await EmbedBuilder.create_info_embed(
                     title="No Historical Files Found",
                     description=f"No historical CSV files found for server `{server_id}` in the last {safe_days} days."
                 )
@@ -1217,7 +1217,7 @@ class CSVProcessorCog(commands.Cog):
             await interaction.followup.send(embed=embed, ephemeral=True)
         except Exception as e:
             logger.error(f"Error in historical parse command: {e}")
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Processing Error",
                 description=f"An error occurred during historical parsing: {str(e)}"
             )
@@ -1239,7 +1239,7 @@ class CSVProcessorCog(commands.Cog):
         server_configs = await self._get_server_configs()
 
         # Create status embed
-        embed = EmbedBuilder.info(
+        embed = await EmbedBuilder.create_info_embed(
             title="CSV Processor Status",
             description="Current status of the CSV processor"
         )

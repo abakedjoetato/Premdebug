@@ -639,6 +639,107 @@ class EmbedBuilder:
         )
     
     @classmethod
+    async def create_stats_embed(cls, player_stats: Dict[str, Any], server_name: str = "Unknown") -> discord.Embed:
+        """Create a player statistics embed with consistent formatting for the stats command
+        
+        Args:
+            player_stats: Dictionary containing player statistics
+            server_name: Name of the server (default: "Unknown")
+            
+        Returns:
+            discord.Embed: Player stats embed
+        """
+        # Create base embed with player info
+        player_name = player_stats.get('player_name', 'Unknown Player')
+        
+        embed = discord.Embed(
+            title=f"📊 Player Stats: {player_name}",
+            description=f"Statistics for {player_name} on {server_name}",
+            color=cls.COLORS["primary"],
+            timestamp=datetime.utcnow()
+        )
+        
+        # Add footer
+        embed.set_footer(text="Tower of Temptation PvP Statistics")
+        
+        return embed
+        
+    @classmethod
+    async def create_rivalry_embed(cls, 
+                                  player1_name: str,
+                                  player2_name: str,
+                                  player1_kills: int,
+                                  player2_kills: int,
+                                  total_kills: int = 0,
+                                  last_kill: Optional[str] = None,
+                                  last_weapon: Optional[str] = None,
+                                  last_location: Optional[str] = None) -> discord.Embed:
+        """Create a rivalry statistics embed
+        
+        Args:
+            player1_name: Name of first player
+            player2_name: Name of second player
+            player1_kills: Number of kills by player 1
+            player2_kills: Number of kills by player 2
+            total_kills: Total kills in the rivalry
+            last_kill: Timestamp of the last kill
+            last_weapon: Weapon used in the last kill
+            last_location: Location of the last kill
+            
+        Returns:
+            discord.Embed: Rivalry embed
+        """
+        # Calculate winner and scores
+        if player1_kills > player2_kills:
+            winner = player1_name
+            winner_kills = player1_kills
+            loser = player2_name
+            loser_kills = player2_kills
+            lead = player1_kills - player2_kills
+        else:
+            winner = player2_name
+            winner_kills = player2_kills
+            loser = player1_name
+            loser_kills = player1_kills
+            lead = player2_kills - player1_kills
+            
+        # Calculate lead description
+        if lead > 10:
+            lead_desc = "Dominating!"
+        elif lead > 5:
+            lead_desc = "Significant Lead"
+        elif lead > 1:
+            lead_desc = "Leading"
+        else:
+            lead_desc = "Close Match"
+            
+        # Create embed
+        embed = discord.Embed(
+            title=f"⚔️ Rivalry: {player1_name} vs {player2_name}",
+            description=f"{winner} is ahead by {lead} kills. ({lead_desc})",
+            color=cls.COLORS["danger"],
+            timestamp=datetime.utcnow()
+        )
+        
+        # Add stats fields
+        embed.add_field(name=player1_name, value=f"{player1_kills} kills", inline=True)
+        embed.add_field(name=player2_name, value=f"{player2_kills} kills", inline=True)
+        embed.add_field(name="Total Kills", value=str(total_kills), inline=True)
+        
+        # Add last kill info if available
+        if last_kill and last_weapon:
+            embed.add_field(
+                name="Last Kill",
+                value=f"**When:** {last_kill}\n**Weapon:** {last_weapon}\n**Location:** {last_location or 'Unknown'}",
+                inline=False
+            )
+            
+        # Add footer
+        embed.set_footer(text="Tower of Temptation PvP Statistics")
+        
+        return embed
+        
+    @classmethod
     async def player_stats_embed(cls, 
                                 player_name: str, 
                                 stats: Dict[str, Any], 

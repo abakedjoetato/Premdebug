@@ -44,14 +44,22 @@ class Events(commands.Cog):
             guild_data = None
             guild_model = None
             try:
-                guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
+                # Get guild data with enhanced lookup
+                guild_id = ctx.guild.id
+                
+                # Try string conversion of guild ID first
+                guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
+                if guild_data is None:
+                    # Try with integer ID
+                    guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
+                
                 if guild_data is not None:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
             except Exception as e:
                 logger.warning(f"Error getting guild model: {e}")
 
-            embed = EmbedBuilder.create_base_embed(
+            embed = await EmbedBuilder.create_base_embed(
                 "Events Commands Help",
                 "Use these commands to manage event monitoring and notifications for your servers."
             , guild=guild_model)
@@ -125,7 +133,15 @@ class Events(commands.Cog):
             guild_data = None
             guild_model = None
             try:
-                guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
+                # Get guild data with enhanced lookup
+                guild_id = ctx.guild.id
+                
+                # Try string conversion of guild ID first
+                guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
+                if guild_data is None:
+                    # Try with integer ID
+                    guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
+                
                 if guild_data is not None:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
@@ -137,7 +153,15 @@ class Events(commands.Cog):
                 return
 
             # Get guild data
-            guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
+            # Get guild data with enhanced lookup
+            guild_id = ctx.guild.id
+            
+            # Try string conversion of guild ID first
+            guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
+            if guild_data is None:
+                # Try with integer ID
+                guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
+            
             if guild_data is None:
                 embed = await EmbedBuilder.create_error_embed(
                     "Error",
@@ -184,7 +208,7 @@ class Events(commands.Cog):
                     return
 
             # Create initial response
-            embed = EmbedBuilder.create_base_embed(
+            embed = await EmbedBuilder.create_base_embed(
                 "Starting Events Monitor",
                 f"Starting events monitor for server {server_id}..."
             , guild=guild_model)
@@ -206,7 +230,7 @@ class Events(commands.Cog):
 
             # Update response after a short delay
             await asyncio.sleep(2)
-            embed = EmbedBuilder.create_success_embed(
+            embed = await EmbedBuilder.create_success_embed(
                 "Events Monitor Started",
                 f"Events monitor for server {server_id} has been started successfully."
             , guild=guild_model)
@@ -232,7 +256,15 @@ class Events(commands.Cog):
             guild_data = None
             guild_model = None
             try:
-                guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
+                # Get guild data with enhanced lookup
+                guild_id = ctx.guild.id
+                
+                # Try string conversion of guild ID first
+                guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
+                if guild_data is None:
+                    # Try with integer ID
+                    guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
+                
                 if guild_data is not None:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
@@ -262,7 +294,7 @@ class Events(commands.Cog):
             self.bot.background_tasks.pop(task_name)
 
             # Send success message
-            embed = EmbedBuilder.create_success_embed(
+            embed = await EmbedBuilder.create_success_embed(
                 "Events Monitor Stopped",
                 f"Events monitor for server {server_id} has been stopped successfully."
             , guild=guild_model)
@@ -288,7 +320,15 @@ class Events(commands.Cog):
             guild_data = None
             guild_model = None
             try:
-                guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
+                # Get guild data with enhanced lookup
+                guild_id = ctx.guild.id
+                
+                # Try string conversion of guild ID first
+                guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
+                if guild_data is None:
+                    # Try with integer ID
+                    guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
+                
                 if guild_data is not None:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
@@ -296,7 +336,15 @@ class Events(commands.Cog):
                 logger.warning(f"Error getting guild model: {e}")
 
             # Get guild data
-            guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
+            # Get guild data with enhanced lookup
+            guild_id = ctx.guild.id
+            
+            # Try string conversion of guild ID first
+            guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
+            if guild_data is None:
+                # Try with integer ID
+                guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
+            
             if guild_data is None:
                 embed = await EmbedBuilder.create_error_embed(
                     "Error",
@@ -329,7 +377,7 @@ class Events(commands.Cog):
 
             # Create embed
             if running_monitors:
-                embed = EmbedBuilder.create_base_embed(
+                embed = await EmbedBuilder.create_base_embed(
                     "Events Monitor Status",
                     f"Currently running events monitors for {ctx.guild.name}"
                 , guild=guild_model)
@@ -341,7 +389,7 @@ class Events(commands.Cog):
                         inline=False
                     )
             else:
-                embed = EmbedBuilder.create_base_embed(
+                embed = await EmbedBuilder.create_base_embed(
                     "Events Monitor Status",
                     f"No events monitors are currently running for {ctx.guild.name}."
                 , guild=guild_model)
@@ -399,7 +447,15 @@ class Events(commands.Cog):
             guild_data = None
             guild_model = None
             try:
-                guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
+                # Get guild data with enhanced lookup
+                guild_id = ctx.guild.id
+                
+                # Try string conversion of guild ID first
+                guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
+                if guild_data is None:
+                    # Try with integer ID
+                    guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
+                
                 if guild_data is not None:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
@@ -413,7 +469,15 @@ class Events(commands.Cog):
                 limit = 20
 
             # Get guild data
-            guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
+            # Get guild data with enhanced lookup
+            guild_id = ctx.guild.id
+            
+            # Try string conversion of guild ID first
+            guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
+            if guild_data is None:
+                # Try with integer ID
+                guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
+            
             if guild_data is None:
                 embed = await EmbedBuilder.create_error_embed(
                     "Error",
@@ -468,7 +532,7 @@ class Events(commands.Cog):
                 return
 
             # Create embed
-            embed = EmbedBuilder.create_base_embed(
+            embed = await EmbedBuilder.create_base_embed(
                 "Recent Events",
                 f"Recent events for {server_name}" +
                 (f" (Type: {event_type})" if event_type != "all" else "")
@@ -529,7 +593,15 @@ class Events(commands.Cog):
             guild_data = None
             guild_model = None
             try:
-                guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
+                # Get guild data with enhanced lookup
+                guild_id = ctx.guild.id
+                
+                # Try string conversion of guild ID first
+                guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
+                if guild_data is None:
+                    # Try with integer ID
+                    guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
+                
                 if guild_data is not None:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
@@ -537,7 +609,15 @@ class Events(commands.Cog):
                 logger.warning(f"Error getting guild model: {e}")
 
             # Get guild data
-            guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
+            # Get guild data with enhanced lookup
+            guild_id = ctx.guild.id
+            
+            # Try string conversion of guild ID first
+            guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
+            if guild_data is None:
+                # Try with integer ID
+                guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
+            
             if guild_data is None:
                 embed = await EmbedBuilder.create_error_embed(
                     "Error",
@@ -580,7 +660,7 @@ class Events(commands.Cog):
             player_count, online_players = await server.get_online_player_count()
 
             # Create embed
-            embed = EmbedBuilder.create_base_embed(
+            embed = await EmbedBuilder.create_base_embed(
                 "Online Players",
                 f"Currently {player_count} player(s) online on {server_name}"
             , guild=guild_model)
@@ -643,7 +723,15 @@ class Events(commands.Cog):
             guild_data = None
             guild_model = None
             try:
-                guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
+                # Get guild data with enhanced lookup
+                guild_id = ctx.guild.id
+                
+                # Try string conversion of guild ID first
+                guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
+                if guild_data is None:
+                    # Try with integer ID
+                    guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
+                
                 if guild_data is not None:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
@@ -684,7 +772,7 @@ class Events(commands.Cog):
 
             # If no settings were provided, show current settings
             if not settings:
-                embed = EmbedBuilder.create_base_embed(
+                embed = await EmbedBuilder.create_base_embed(
                     "Event Notification Settings",
                     f"Current event notification settings for {server.name}"
                 , guild=guild_model)
@@ -723,7 +811,7 @@ class Events(commands.Cog):
                 return
 
             # Create success embed
-            embed = EmbedBuilder.create_success_embed(
+            embed = await EmbedBuilder.create_success_embed(
                 "Event Notifications Updated",
                 f"Successfully updated event notification settings for {server.name}."
             , guild=guild_model)
@@ -769,7 +857,15 @@ class Events(commands.Cog):
             guild_data = None
             guild_model = None
             try:
-                guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
+                # Get guild data with enhanced lookup
+                guild_id = ctx.guild.id
+                
+                # Try string conversion of guild ID first
+                guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
+                if guild_data is None:
+                    # Try with integer ID
+                    guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
+                
                 if guild_data is not None:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
@@ -800,7 +896,7 @@ class Events(commands.Cog):
 
             # If no settings were provided, show current settings
             if not settings:
-                embed = EmbedBuilder.create_base_embed(
+                embed = await EmbedBuilder.create_base_embed(
                     "Connection Notification Settings",
                     f"Current connection notification settings for {server.name}"
                 , guild=guild_model)
@@ -838,7 +934,7 @@ class Events(commands.Cog):
                 return
 
             # Create success embed
-            embed = EmbedBuilder.create_success_embed(
+            embed = await EmbedBuilder.create_success_embed(
                 "Connection Notifications Updated",
                 f"Successfully updated connection notification settings for {server.name}."
             , guild=guild_model)
@@ -886,7 +982,15 @@ class Events(commands.Cog):
             guild_data = None
             guild_model = None
             try:
-                guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
+                # Get guild data with enhanced lookup
+                guild_id = ctx.guild.id
+                
+                # Try string conversion of guild ID first
+                guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
+                if guild_data is None:
+                    # Try with integer ID
+                    guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
+                
                 if guild_data is not None:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
@@ -919,7 +1023,7 @@ class Events(commands.Cog):
 
             # If no settings were provided, show current settings
             if not settings:
-                embed = EmbedBuilder.create_base_embed(
+                embed = await EmbedBuilder.create_base_embed(
                     "Suicide Notification Settings",
                     f"Current suicide notification settings for {server.name}"
                 , guild=guild_model)
@@ -958,7 +1062,7 @@ class Events(commands.Cog):
                 return
 
             # Create success embed
-            embed = EmbedBuilder.create_success_embed(
+            embed = await EmbedBuilder.create_success_embed(
                 "Suicide Notifications Updated",
                 f"Successfully updated suicide notification settings for {server.name}."
             , guild=guild_model)
@@ -1282,7 +1386,7 @@ async def start_events_monitor(bot, guild_id: int, server_id: str):
         if channel_configured is not None and events_channel:
             try:
                 guild_model = await Guild.get_by_id(bot.db, guild_id)
-                embed = EmbedBuilder.create_base_embed(
+                embed = await EmbedBuilder.create_base_embed(
                     "Events Monitor Active",
                     f"Monitoring events for server {server.name} (ID: {server_id}).",
                     guild=guild_model
@@ -1596,7 +1700,7 @@ async def process_connection(bot, server, connection_data, channel):
         platform = connection_data.get("platform", "Unknown")
 
         # Create themed base embed
-        embed = EmbedBuilder.create_base_embed(
+        embed = await EmbedBuilder.create_base_embed(
             title=title,
             description=f"**{player_name}** has {action} to the server",
             guild=guild_model

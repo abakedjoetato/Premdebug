@@ -65,7 +65,7 @@ class PlayerLinksCog(commands.Cog):
         # Check if player exists
         player = await Player.get_by_player_name(server_id, player_name)
         if player is None:
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Player Not Found",
                 description=f"Player `{player_name}` not found on server `{server_id}`."
             )
@@ -75,7 +75,7 @@ class PlayerLinksCog(commands.Cog):
         # Check if player is already linked to another Discord user
         existing_link = await PlayerLink.get_by_player_id(server_id, player.player_id)
         if existing_link and existing_link.discord_id != str(interaction.user.id):
-            embed = EmbedBuilder.warning(
+            embed = await EmbedBuilder.create_warning_embed(
                 title="Player Already Linked",
                 description=f"Player `{player_name}` is already linked to another Discord user."
             )
@@ -95,7 +95,7 @@ class PlayerLinksCog(commands.Cog):
         # Update player Discord ID
         await player.set_discord_id(str(interaction.user.id))
 
-        embed = EmbedBuilder.success(
+        embed = await EmbedBuilder.create_success_embed(
             title="Player Linked",
             description=f"Successfully linked your Discord account to player `{player_name}` on server `{server_id}`."
         )
@@ -131,7 +131,7 @@ class PlayerLinksCog(commands.Cog):
         # Check if player exists
         player = await Player.get_by_player_name(server_id, player_name)
         if player is None:
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Player Not Found",
                 description=f"Player `{player_name}` not found on server `{server_id}`."
             )
@@ -141,7 +141,7 @@ class PlayerLinksCog(commands.Cog):
         # Check if link exists and belongs to this user
         link = await PlayerLink.get_by_player_id(server_id, player.player_id)
         if not link:
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="No Link Found",
                 description=f"Player `{player_name}` is not linked to any Discord user."
             )
@@ -149,7 +149,7 @@ class PlayerLinksCog(commands.Cog):
             return
 
         if link.discord_id != str(interaction.user.id):
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Not Your Link",
                 description=f"Player `{player_name}` is linked to another Discord user."
             )
@@ -163,12 +163,12 @@ class PlayerLinksCog(commands.Cog):
         if success:
             await player.set_discord_id(None)
 
-            embed = EmbedBuilder.success(
+            embed = await EmbedBuilder.create_success_embed(
                 title="Player Unlinked",
                 description=f"Successfully unlinked your Discord account from player `{player_name}` on server `{server_id}`."
             )
         else:
-            embed = EmbedBuilder.error(
+            embed = await EmbedBuilder.create_error_embed(
                 title="Unlink Failed",
                 description=f"Failed to unlink player `{player_name}`. Please try again later."
             )
@@ -203,7 +203,7 @@ class PlayerLinksCog(commands.Cog):
         links = await PlayerLink.get_by_discord_id(server_id, str(interaction.user.id))
 
         if not links:
-            embed = EmbedBuilder.info(
+            embed = await EmbedBuilder.create_info_embed(
                 title="No Linked Players",
                 description=f"You don't have any players linked on server `{server_id}`."
             )

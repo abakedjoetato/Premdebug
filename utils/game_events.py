@@ -89,7 +89,7 @@ async def create_airdrop_embed(airdrop_event: Dict[str, Any], server: Server, gu
 async def create_helicrash_embed(crash_event: Dict[str, Any], server: Server, guild: Optional[Guild] = None) -> discord.Embed:
     """Create a Discord embed for a helicopter crash event"""
     # Create the embed with red color
-    embed = EmbedBuilder.create_base_embed(
+    embed = await EmbedBuilder.create_base_embed(
         title="Helicopter Crash",
         description="A helicopter has crashed somewhere on the map",
         guild=guild
@@ -118,7 +118,7 @@ async def create_helicrash_embed(crash_event: Dict[str, Any], server: Server, gu
 async def create_trader_embed(trader_event: Dict[str, Any], server: Server, guild: Optional[Guild] = None) -> discord.Embed:
     """Create a Discord embed for a trader event"""
     # Create the embed with green color
-    embed = EmbedBuilder.create_base_embed(
+    embed = await EmbedBuilder.create_base_embed(
         title="Roaming Trader",
         description="A trader has appeared on the map",
         guild=guild
@@ -147,7 +147,7 @@ async def create_trader_embed(trader_event: Dict[str, Any], server: Server, guil
 async def create_convoy_embed(convoy_event: Dict[str, Any], server: Server, guild: Optional[Guild] = None) -> discord.Embed:
     """Create a Discord embed for a convoy event"""
     # Create the embed with purple color
-    embed = EmbedBuilder.create_base_embed(
+    embed = await EmbedBuilder.create_base_embed(
         title="Convoy Event",
         description="A convoy is moving through the area",
         guild=guild
@@ -199,7 +199,7 @@ async def create_event_embed(event_data: Dict[str, Any], server: Server, guild: 
             return await create_convoy_embed(event_data, server, guild)
         else:
             # Fallback for unknown event types
-            embed = EmbedBuilder.create_base_embed(
+            embed = await EmbedBuilder.create_base_embed(
                 title=f"Game Event: {event_type.capitalize()}",
                 description=f"A {event_type} event has occurred",
                 guild=guild

@@ -59,7 +59,7 @@ class Admin(commands.Cog):
             await guild.set_admin_role(self.bot.db, str(role.id))
 
             # Send success message
-            embed = EmbedBuilder.create_success_embed(
+            embed = await EmbedBuilder.create_success_embed(
                 "Admin Role Set",
                 f"The {role.mention} role has been set as the admin role for server management."
             , guild=guild_model)
@@ -67,7 +67,7 @@ class Admin(commands.Cog):
 
         except Exception as e:
             logger.error(f"Error setting admin role: {e}", exc_info=True)
-            embed = EmbedBuilder.create_error_embed(
+            embed = await EmbedBuilder.create_error_embed(
                 "Error",
                 f"An error occurred while setting the admin role: {e}"
             , guild=guild_model)
@@ -281,7 +281,15 @@ class Admin(commands.Cog):
             guild_data = None
             guild_model = None
             try:
-                guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
+                # Get guild data with enhanced lookup
+                guild_id = ctx.guild.id
+                
+                # Try string conversion of guild ID first
+                guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
+                if guild_data is None:
+                    # Try with integer ID
+                    guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
+                
                 if guild_data is not None:
                     # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)
@@ -375,7 +383,15 @@ class Admin(commands.Cog):
         guild_data = None
         guild_model = None
         try:
-            guild_data = await self.bot.db.guilds.find_one({"guild_id": ctx.guild.id})
+            # Get guild data with enhanced lookup
+            guild_id = ctx.guild.id
+            
+            # Try string conversion of guild ID first
+            guild_data = await self.bot.db.guilds.find_one({"guild_id": str(guild_id)})
+            if guild_data is None:
+                # Try with integer ID
+                guild_data = await self.bot.db.guilds.find_one({"guild_id": int(guild_id)})
+            
             if guild_data is not None:
                 # Use create_from_db_document to ensure proper conversion of premium_tier
                     guild_model = Guild.create_from_db_document(guild_data, self.bot.db)

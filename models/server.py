@@ -200,9 +200,48 @@ class Server(BaseModel):
             }
             document = await db.game_servers.find_one(new_query)
             
+        # If still not found, check servers collection (where CSV data is stored)    
+        if document is None:
+            logger.debug(f"Server not found in game_servers, checking servers collection")
+            
+            # Try exact match in servers collection
+            server_query = {"server_id": standardized_server_id}
+            if guild_id is not None:
+                server_query["guild_id"] = str(guild_id)
+                
+            document = await db.servers.find_one(server_query)
+            
+            # Try with regex if needed
+            if document is None:
+                regex_server_query = {
+                    **server_query,
+                    "server_id": {"$regex": f"^{standardized_server_id}$", "$options": "i"}
+                }
+                document = await db.servers.find_one(regex_server_query)
+            
+            # If document is found, map it to format expected by from_document
+            if document is not None:
+                logger.info(f"Found server {standardized_server_id} in servers collection")
+                # Extract original server ID for path construction if available
+                original_server_id = document.get("original_server_id")
+                
+                # Convert to expected format
+                document = {
+                    "server_id": document.get("server_id"),
+                    "guild_id": document.get("guild_id"),
+                    "name": document.get("name", "Unknown Server"),
+                    "sftp_host": document.get("hostname") or document.get("sftp_host"),
+                    "sftp_port": document.get("port") or document.get("sftp_port", 22),
+                    "sftp_username": document.get("username") or document.get("sftp_username"),
+                    "sftp_password": document.get("password") or document.get("sftp_password"),
+                    "log_path": document.get("log_path") or document.get("sftp_path", ""),
+                    "original_server_id": original_server_id,
+                    "_id": document.get("_id")
+                }
+            
         # If still no results and guild_id is provided, look in the guild's servers list as fallback
         if not document and guild_id is not None:
-            logger.debug(f"Server not found in game_servers, checking guild's server list")
+            logger.debug(f"Server not found in game_servers or servers, checking guild's server list")
             guild_doc = await db.guilds.find_one({"guild_id": str(guild_id)})
             
             if guild_doc is not None and "servers" in guild_doc:
@@ -257,7 +296,73 @@ class Server(BaseModel):
         Returns:
             Server object or None if found is None
         """
-        document = await db.game_servers.find_one({"name": name, "guild_id": guild_id})
+        # Ensure consistent string comparisons
+        guild_id_str = str(guild_id)
+        
+        # First try game_servers collection
+        document = await db.game_servers.find_one({"name": name, "guild_id": guild_id_str})
+        
+        # If not found in game_servers, try servers collection
+        if document is None:
+            logger.debug(f"Server '{name}' not found in game_servers for guild {guild_id_str}, checking servers collection")
+            document = await db.servers.find_one({"name": name, "guild_id": guild_id_str})
+            
+            # Format document if found
+            if document is not None:
+                logger.info(f"Found server '{name}' in servers collection for guild {guild_id_str}")
+                original_server_id = document.get("original_server_id")
+                
+                # Convert to expected format
+                document = {
+                    "server_id": document.get("server_id"),
+                    "guild_id": document.get("guild_id"),
+                    "name": document.get("name"),
+                    "sftp_host": document.get("hostname") or document.get("sftp_host"),
+                    "sftp_port": document.get("port") or document.get("sftp_port", 22),
+                    "sftp_username": document.get("username") or document.get("sftp_username"),
+                    "sftp_password": document.get("password") or document.get("sftp_password"),
+                    "log_path": document.get("log_path") or document.get("sftp_path", ""),
+                    "original_server_id": original_server_id,
+                    "_id": document.get("_id")
+                }
+        
+        # If still not found, check guild.servers as fallback
+        if document is None:
+            logger.debug(f"Server '{name}' not found in collections, checking guild.servers for guild {guild_id_str}")
+            guild_doc = await db.guilds.find_one({"guild_id": guild_id_str})
+            
+            if guild_doc is not None and "servers" in guild_doc:
+                for server_data in guild_doc.get("servers", []):
+                    # Check both server_name and name fields for matching
+                    server_name = server_data.get("server_name") or server_data.get("name")
+                    if server_name and server_name.lower() == name.lower():
+                        logger.info(f"Found server '{name}' in guild.servers")
+                        
+                        # Extract the original numeric server ID for path construction
+                        original_server_id = server_data.get("original_server_id")
+                        
+                        # If original_server_id is not found, try to extract it
+                        if original_server_id is None and server_data.get("server_id"):
+                            numeric_parts = ''.join(filter(str.isdigit, server_data.get("server_id", "")))
+                            if numeric_parts:
+                                original_server_id = numeric_parts
+                        
+                        # Create a document
+                        document = {
+                            "server_id": server_data.get("server_id"),
+                            "guild_id": guild_id_str,
+                            "name": server_name,
+                            "sftp_host": server_data.get("sftp_host") or server_data.get("hostname"),
+                            "sftp_port": server_data.get("sftp_port") or server_data.get("port", 22),
+                            "sftp_username": server_data.get("sftp_username") or server_data.get("username"),
+                            "sftp_password": server_data.get("sftp_password") or server_data.get("password"),
+                            "log_path": server_data.get("log_path") or server_data.get("sftp_path", ""),
+                            "original_server_id": original_server_id,
+                            "created_at": datetime.utcnow(),
+                            "updated_at": datetime.utcnow()
+                        }
+                        break  # Stop after finding the first match
+        
         return cls.from_document(document) if document is not None else None
 
     @classmethod
@@ -275,15 +380,92 @@ class Server(BaseModel):
         guild_id_str = str(guild_id)
 
         servers = []
+        seen_ids = set()  # Track server IDs to avoid duplicates
+        
+        # First check game_servers collection
         try:
-            # Only check game_servers collection
             game_servers_cursor = db.game_servers.find({"guild_id": guild_id_str})
             async for document in game_servers_cursor:
                 server = cls.from_document(document)
                 if server is not None:
                     servers.append(server)
+                    seen_ids.add(server.server_id)
         except Exception as e:
             logger.error(f"Error fetching servers from game_servers collection: {e}")
+
+        # Then check servers collection
+        try:
+            logger.debug(f"Checking servers collection for guild {guild_id_str}")
+            servers_cursor = db.servers.find({"guild_id": guild_id_str})
+            async for document in servers_cursor:
+                # Skip if we already have this server
+                server_id = document.get("server_id")
+                if server_id in seen_ids:
+                    continue
+                
+                # Format document for from_document
+                formatted_doc = {
+                    "server_id": server_id,
+                    "guild_id": document.get("guild_id"),
+                    "name": document.get("name", "Unknown Server"),
+                    "sftp_host": document.get("hostname") or document.get("sftp_host"),
+                    "sftp_port": document.get("port") or document.get("sftp_port", 22),
+                    "sftp_username": document.get("username") or document.get("sftp_username"),
+                    "sftp_password": document.get("password") or document.get("sftp_password"),
+                    "log_path": document.get("log_path") or document.get("sftp_path", ""),
+                    "original_server_id": document.get("original_server_id"),
+                    "_id": document.get("_id")
+                }
+                
+                server = cls.from_document(formatted_doc)
+                if server is not None:
+                    servers.append(server)
+                    seen_ids.add(server_id)
+        except Exception as e:
+            logger.error(f"Error fetching servers from servers collection: {e}")
+            
+        # Finally check guild.servers as fallback
+        if len(servers) == 0:
+            try:
+                logger.debug(f"Checking guild.servers for guild {guild_id_str}")
+                guild_doc = await db.guilds.find_one({"guild_id": guild_id_str})
+                
+                if guild_doc is not None and "servers" in guild_doc:
+                    for server_data in guild_doc.get("servers", []):
+                        server_id = server_data.get("server_id")
+                        if server_id in seen_ids:
+                            continue
+                            
+                        # Extract the original numeric server ID for path construction
+                        original_server_id = server_data.get("original_server_id")
+                        
+                        # If original_server_id is not found, try to extract it
+                        if original_server_id is None and server_data.get("server_id"):
+                            # Check if server_id contains numeric segment
+                            numeric_parts = ''.join(filter(str.isdigit, server_data.get("server_id", "")))
+                            if numeric_parts:
+                                original_server_id = numeric_parts
+                                
+                        formatted_doc = {
+                            "server_id": server_id,
+                            "guild_id": guild_id_str,
+                            "name": server_data.get("server_name", "Unknown Server"),
+                            "sftp_host": server_data.get("sftp_host") or server_data.get("hostname"),
+                            "sftp_port": server_data.get("sftp_port") or server_data.get("port", 22),
+                            "sftp_username": server_data.get("sftp_username") or server_data.get("username"),
+                            "sftp_password": server_data.get("sftp_password") or server_data.get("password"),
+                            "log_path": server_data.get("log_path") or server_data.get("sftp_path", ""),
+                            "original_server_id": original_server_id,
+                            "created_at": datetime.utcnow(),
+                            "updated_at": datetime.utcnow()
+                        }
+                        
+                        server = cls.from_document(formatted_doc)
+                        if server is not None:
+                            servers.append(server)
+                            seen_ids.add(server_id)
+            except Exception as e:
+                logger.error(f"Error fetching servers from guild.servers: {e}")
 
         return servers
 
@@ -298,7 +480,70 @@ class Server(BaseModel):
         Returns:
             Server object or None if no servers found
         """
-        document = await db.game_servers.find_one({"guild_id": guild_id})
+        # Ensure consistent string comparison
+        guild_id_str = str(guild_id)
+        
+        # First try game_servers collection
+        document = await db.game_servers.find_one({"guild_id": guild_id_str})
+        
+        # If not found, try servers collection where CSV data is stored
+        if document is None:
+            logger.debug(f"No server found in game_servers for guild {guild_id_str}, checking servers collection")
+            document = await db.servers.find_one({"guild_id": guild_id_str})
+            
+            # If found in servers collection, format document properly for from_document
+            if document is not None:
+                logger.info(f"Found server in servers collection for guild {guild_id_str}")
+                # Extract original server ID for path construction if available
+                original_server_id = document.get("original_server_id")
+                
+                # Convert to expected format
+                document = {
+                    "server_id": document.get("server_id"),
+                    "guild_id": document.get("guild_id"),
+                    "name": document.get("name", "Unknown Server"),
+                    "sftp_host": document.get("hostname") or document.get("sftp_host"),
+                    "sftp_port": document.get("port") or document.get("sftp_port", 22),
+                    "sftp_username": document.get("username") or document.get("sftp_username"),
+                    "sftp_password": document.get("password") or document.get("sftp_password"),
+                    "log_path": document.get("log_path") or document.get("sftp_path", ""),
+                    "original_server_id": original_server_id,
+                    "_id": document.get("_id")
+                }
+        
+        # If still not found, look in guild.servers (embedded in guild document)
+        if document is None:
+            logger.debug(f"No server found in game_servers or servers collection for guild {guild_id_str}, checking guild.servers")
+            guild_doc = await db.guilds.find_one({"guild_id": guild_id_str})
+            
+            if guild_doc is not None and "servers" in guild_doc and len(guild_doc.get("servers", [])) > 0:
+                logger.info(f"Using first server from guild.servers for guild {guild_id_str}")
+                server_data = guild_doc["servers"][0]
+                
+                # Extract the original numeric server ID for path construction
+                original_server_id = server_data.get("original_server_id")
+                
+                # If original_server_id is not found, try to extract it from server_id
+                if original_server_id is None and server_data.get("server_id"):
+                    # Check if server_id contains numeric segment that could be original ID
+                    numeric_parts = ''.join(filter(str.isdigit, server_data.get("server_id", "")))
+                    if numeric_parts:
+                        original_server_id = numeric_parts
+                
+                document = {
+                    "server_id": server_data.get("server_id"),
+                    "guild_id": guild_id_str,
+                    "name": server_data.get("server_name", "Unknown Server"),
+                    "sftp_host": server_data.get("sftp_host") or server_data.get("hostname"),
+                    "sftp_port": server_data.get("sftp_port") or server_data.get("port", 22),
+                    "sftp_username": server_data.get("sftp_username") or server_data.get("username"),
+                    "sftp_password": server_data.get("sftp_password") or server_data.get("password"),
+                    "log_path": server_data.get("log_path") or server_data.get("sftp_path", ""),
+                    "original_server_id": original_server_id,
+                    "created_at": datetime.utcnow(),
+                    "updated_at": datetime.utcnow()
+                }
+        
         return cls.from_document(document) if document is not None else None
 
     async def update_status(self, db, status: str, error_message: Optional[str] = None) -> bool:
